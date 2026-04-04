@@ -1,7 +1,7 @@
 const API_BASE_URL =
   window.CIVICFIX_API_BASE_URL ||
   localStorage.getItem('civicApiBaseUrl') ||
-  'http://localhost:4000/api';
+  'https://civic-fix-tan9.onrender.com/api';
 const AUTH_TOKEN_KEY = 'civicToken';
 
 function getToken() {
