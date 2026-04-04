@@ -8,47 +8,74 @@
   <link rel="stylesheet" href="css/style.css"/>
   <style>
     .bar-segment{transition:width 1.2s cubic-bezier(0.4,0,0.2,1);}
-    .admin-gate{backdrop-filter:blur(12px);}
+    .admin-gate{backdrop-filter:blur(16px);}
     tr.table-row{cursor:pointer;}
-    .progress-card{transition:all 0.2s;border-left:3px solid #6366f1;}
-    .review-star{cursor:pointer;transition:transform 0.15s;}
-    .review-star:hover{transform:scale(1.3);}
+    .progress-card{transition:all 0.2s;border-left:3px solid #8b5cf6;}
+    .review-card{transition:all 0.25s ease;border:2px solid transparent;}
+    .review-card.agree{border-color:#14b8a6;background:rgba(20,184,166,0.08);}
+    .review-card.disagree{border-color:#f43f5e;background:rgba(244,63,94,0.08);}
+    .vote-bar{transition:width 1s cubic-bezier(0.4,0,0.2,1);}
+    .photo-preview-img{width:100%;height:140px;object-fit:cover;border-radius:0.75rem;}
+    .resolve-step{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:12px;border:1.5px solid #e2e8f0;transition:all 0.2s;}
+    .dark .resolve-step{border-color:#334155;}
+    .resolve-step.active{border-color:#8b5cf6;background:rgba(139,92,246,0.06);}
+    .step-num{width:28px;height:28px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;transition:all 0.2s;}
+    .resolve-step.active .step-num{background:linear-gradient(135deg,#8b5cf6,#14b8a6);color:white;}
+    .resolve-step.done .step-num{background:#14b8a6;color:white;}
   </style>
 </head>
 <body class="min-h-screen transition-colors duration-300 page-bg-mesh dark:bg-gray-950">
 <div id="navbar"></div>
 
-<!-- Admin Gate -->
-<div id="admin-gate" class="hidden fixed inset-0 z-[100] bg-gray-950/80 admin-gate flex items-center justify-center p-4">
+<!-- Admin Gate (only shown if not admin) -->
+<div id="admin-gate" class="hidden fixed inset-0 z-[100] bg-gray-950/85 admin-gate flex items-center justify-center p-4">
   <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 w-full max-w-sm scale-in">
     <div class="text-center mb-6">
-      <div class="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl flex items-center justify-center mx-auto mb-4">
-        <svg class="w-8 h-8 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      <div class="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:linear-gradient(135deg,#8b5cf6,#14b8a6)">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
       </div>
-      <h2 class="text-xl font-extrabold text-gray-900 dark:text-white">Admin Access</h2>
-      <p class="text-sm text-gray-500 mt-1">Enter admin PIN to unlock</p>
+      <h2 class="text-xl font-extrabold text-gray-900 dark:text-white">Admin Only</h2>
+      <p class="text-sm text-gray-500 mt-1">This area is restricted to administrators.</p>
     </div>
     <div class="space-y-3">
-      <input type="password" id="admin-pin" placeholder="Enter PIN" class="form-input text-center text-lg tracking-widest" maxlength="6" onkeydown="if(event.key==='Enter')checkAdminPin()"/>
-      <button onclick="checkAdminPin()" class="btn-primary w-full justify-center py-3">Unlock Dashboard</button>
+      <input type="password" id="admin-pin" placeholder="Admin sign-in only" class="form-input text-center text-lg tracking-widest hidden" maxlength="6"/>
+      <button class="btn-primary w-full justify-center py-3">Sign In</button>
       <a href="index.html" class="block text-center text-sm text-gray-500 hover:text-gray-700 mt-2">← Back to Feed</a>
     </div>
-    <p class="text-xs text-gray-400 text-center mt-4">Demo PIN: <strong class="text-violet-600">1234</strong></p>
+    <p class="text-xs text-gray-400 text-center mt-4">Administrator access uses your backend account.</p>
+  </div>
+</div>
+
+<!-- Not-admin redirect notice (for regular logged-in users) -->
+<div id="not-admin-notice" class="hidden fixed inset-0 z-[100] bg-gray-950/85 admin-gate flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 w-full max-w-sm scale-in text-center">
+    <div class="w-16 h-16 bg-rose-100 dark:bg-rose-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+    </div>
+    <h2 class="text-xl font-extrabold text-gray-900 dark:text-white mb-2">Access Denied</h2>
+    <p class="text-sm text-gray-500 mb-6">This dashboard is only accessible to administrators. You are logged in as a regular user.</p>
+    <a href="index.html" class="btn-primary justify-center w-full">← Back to Feed</a>
   </div>
 </div>
 
 <!-- Dashboard -->
 <div id="dashboard" class="hidden">
 <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 fade-in-up">
     <div>
-      <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white">Admin Dashboard</h1>
-      <p class="text-gray-500 text-sm">Monitor, manage and resolve civic issues</p>
+      <div class="flex items-center gap-3 mb-1">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#8b5cf6,#14b8a6)">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        </div>
+        <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white">Admin Dashboard</h1>
+      </div>
+      <p class="text-gray-500 text-sm pl-13">Monitor, manage and resolve civic issues</p>
     </div>
     <div class="flex items-center gap-3">
-      <div class="flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-3 py-2 rounded-xl text-sm font-semibold">
-        <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>Live
+      <div class="flex items-center gap-2 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 px-3 py-2 rounded-xl text-sm font-semibold">
+        <div class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></div>Live
       </div>
       <button onclick="exportData()" class="btn-secondary text-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>Export CSV
@@ -59,20 +86,44 @@
   <!-- Stats -->
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
     <div class="stat-card">
-      <div class="flex items-center justify-between mb-3"><div class="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center"><svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></div><span class="text-xs text-green-600 font-semibold">+12% ↑</span></div>
-      <div class="text-3xl font-extrabold text-gray-900 dark:text-white count-anim" data-target="128">0</div><div class="text-sm text-gray-500 mt-0.5">Total Issues</div>
+      <div class="flex items-center justify-between mb-3">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#e0e7ff,#c7d2fe)">
+          <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        </div>
+        <span class="text-xs text-teal-600 font-semibold">+12% ↑</span>
+      </div>
+      <div class="text-3xl font-extrabold text-gray-900 dark:text-white count-anim" data-target="128">0</div>
+      <div class="text-sm text-gray-500 mt-0.5">Total Issues</div>
     </div>
     <div class="stat-card">
-      <div class="flex items-center justify-between mb-3"><div class="w-10 h-10 bg-green-100 dark:bg-green-900/40 rounded-xl flex items-center justify-center"><svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div><span class="text-xs text-green-600 font-semibold">+5 this week</span></div>
-      <div class="text-3xl font-extrabold text-green-600 count-anim" data-target="45">0</div><div class="text-sm text-gray-500 mt-0.5">Resolved</div>
+      <div class="flex items-center justify-between mb-3">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#ccfbf1,#99f6e4)">
+          <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <span class="text-xs text-teal-600 font-semibold">+5 this week</span>
+      </div>
+      <div class="text-3xl font-extrabold text-teal-600 count-anim" data-target="45">0</div>
+      <div class="text-sm text-gray-500 mt-0.5">Resolved</div>
     </div>
     <div class="stat-card">
-      <div class="flex items-center justify-between mb-3"><div class="w-10 h-10 bg-orange-100 dark:bg-orange-900/40 rounded-xl flex items-center justify-center"><svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg></div><span class="text-xs text-red-500 font-semibold">Needs action</span></div>
-      <div class="text-3xl font-extrabold text-orange-500 count-anim" data-target="31">0</div><div class="text-sm text-gray-500 mt-0.5">Escalated</div>
+      <div class="flex items-center justify-between mb-3">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#ffe4e6,#fecdd3)">
+          <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        </div>
+        <span class="text-xs text-rose-500 font-semibold">Needs action</span>
+      </div>
+      <div class="text-3xl font-extrabold text-rose-500 count-anim" data-target="31">0</div>
+      <div class="text-sm text-gray-500 mt-0.5">Escalated</div>
     </div>
     <div class="stat-card">
-      <div class="flex items-center justify-between mb-3"><div class="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/40 rounded-xl flex items-center justify-center"><svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><span class="text-xs text-gray-500">avg 6.2 days</span></div>
-      <div class="text-3xl font-extrabold text-yellow-500 count-anim" data-target="52">0</div><div class="text-sm text-gray-500 mt-0.5">Pending</div>
+      <div class="flex items-center justify-between mb-3">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#fef9c3,#fde68a)">
+          <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <span class="text-xs text-gray-500">avg 6.2 days</span>
+      </div>
+      <div class="text-3xl font-extrabold text-yellow-600 count-anim" data-target="52">0</div>
+      <div class="text-sm text-gray-500 mt-0.5">Pending</div>
     </div>
   </div>
 
@@ -80,7 +131,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
     <div class="lg:col-span-2 glass-card rounded-2xl p-5 fade-in-up">
       <h2 class="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-        <svg class="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <span class="w-6 h-6 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#8b5cf6,#14b8a6)"><svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></span>
         Most Affected Areas
       </h2>
       <div class="space-y-3" id="bar-chart"></div>
@@ -94,10 +145,24 @@
     </div>
   </div>
 
-  <!-- Weekly chart -->
+  <!-- Monthly chart -->
   <div class="glass-card rounded-2xl p-5 mb-8 fade-in-up">
-    <h2 class="font-bold text-gray-900 dark:text-white mb-4">Weekly Reports vs Resolutions</h2>
-    <div id="weekly-admin-chart"></div>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-bold text-gray-900 dark:text-white">Monthly Reports vs Resolutions</h2>
+      <span class="text-xs text-gray-400 font-medium">2024</span>
+    </div>
+    <div id="monthly-admin-chart"></div>
+  </div>
+
+  <!-- Awaiting Votes Panel -->
+  <div id="vote-panel" class="hidden mb-6 fade-in-up">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="text-lg">🗳️</span>
+      <h2 class="font-bold text-gray-900 dark:text-white">Awaiting Community Votes</h2>
+      <span id="vote-panel-count" class="ml-1 text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded-full"></span>
+      <p class="text-xs text-gray-400 ml-2 hidden sm:block">Admin cannot influence — outcome decided by citizen votes</p>
+    </div>
+    <div id="vote-panel-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
   </div>
 
   <!-- Issues Table -->
@@ -110,6 +175,7 @@
         <button onclick="filterTable('pending',this)" class="table-filter-btn text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Overdue</button>
         <button onclick="filterTable('open',this)" class="table-filter-btn text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Open</button>
         <button onclick="filterTable('progress',this)" class="table-filter-btn text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">In Progress</button>
+        <button onclick="filterTable('review',this)" class="table-filter-btn text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Awaiting Review</button>
       </div>
     </div>
     <div class="px-4 py-2 border-b border-gray-100 dark:border-gray-800">
@@ -124,66 +190,50 @@
             <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
             <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Heat</th>
             <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Days</th>
-            <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Updates</th>
+            <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Reviews / Votes</th>
             <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
           </tr>
         </thead>
         <tbody id="issues-table-body"></tbody>
       </table>
     </div>
-    <div class="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs text-gray-500">
+    <div class="px-4 py-3 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-500">
       <span id="table-count">—</span>
-      <div class="flex gap-1">
-        <button class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-800">←</button>
-        <button class="px-2 py-1 rounded bg-violet-600 text-white">1</button>
-        <button class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-800">2</button>
-        <button class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-800">→</button>
-      </div>
     </div>
   </div>
 </main>
 </div>
 
-<!-- Progress Update Modal -->
+<!-- ═══════════════════════════════════════════════════════
+     PROGRESS UPDATE MODAL (non-resolve updates)
+═══════════════════════════════════════════════════════ -->
 <div id="progress-modal" class="hidden fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
   <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 scale-in max-h-[90vh] overflow-y-auto">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-bold text-gray-900 dark:text-white">📢 Post Progress Update</h2>
       <button onclick="closeProgressModal()" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800">✕</button>
     </div>
-    <!-- Issue preview -->
     <div id="progress-issue-preview" class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl"></div>
-    <!-- Existing updates -->
     <div id="existing-updates" class="mb-4"></div>
-    <!-- Form -->
     <div class="space-y-4">
       <div>
         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Update Type</label>
-        <div class="grid grid-cols-3 gap-2">
-          <button type="button" onclick="setUpdateType('progress',this)" class="update-type-btn selected border-2 border-violet-500 bg-violet-50 dark:bg-indigo-900/20 rounded-xl p-2 text-center transition-all">
-            <div class="text-lg mb-0.5">🔧</div><div class="text-[10px] font-semibold text-gray-700 dark:text-gray-300">In Progress</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" onclick="setUpdateType('progress',this)" class="update-type-btn selected border-2 border-violet-500 bg-violet-50 dark:bg-violet-900/20 rounded-xl p-3 text-center transition-all">
+            <div class="text-xl mb-1">🔧</div><div class="text-xs font-semibold text-gray-700 dark:text-gray-300">In Progress</div>
           </button>
-          <button type="button" onclick="setUpdateType('escalated',this)" class="update-type-btn border-2 border-gray-200 dark:border-gray-700 rounded-xl p-2 text-center transition-all hover:border-orange-400">
-            <div class="text-lg mb-0.5">⚠️</div><div class="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Escalate</div>
-          </button>
-          <button type="button" onclick="setUpdateType('resolved',this)" class="update-type-btn border-2 border-gray-200 dark:border-gray-700 rounded-xl p-2 text-center transition-all hover:border-green-400">
-            <div class="text-lg mb-0.5">✅</div><div class="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Resolved</div>
+          <button type="button" onclick="setUpdateType('escalated',this)" class="update-type-btn border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3 text-center transition-all hover:border-orange-400">
+            <div class="text-xl mb-1">⚠️</div><div class="text-xs font-semibold text-gray-700 dark:text-gray-300">Escalate</div>
           </button>
         </div>
       </div>
       <div>
-        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Update Message <span class="text-red-500">*</span></label>
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Update Message <span class="text-rose-500">*</span></label>
         <textarea id="progress-text" rows="3" placeholder="Describe what action was taken or what the current status is…" class="form-input resize-none" required></textarea>
       </div>
       <div>
         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Estimated Completion</label>
         <input type="date" id="eta-date" class="form-input"/>
-      </div>
-      <div id="resolve-section" class="hidden">
-        <div class="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl p-3">
-          <p class="text-sm font-semibold text-green-800 dark:text-green-300 mb-1">🎉 Marking as Resolved</p>
-          <p class="text-xs text-green-700 dark:text-green-400">Citizens who reported/upvoted this issue will receive a notification to leave a review.</p>
-        </div>
       </div>
     </div>
     <div class="flex gap-3 mt-5">
@@ -196,52 +246,197 @@
   </div>
 </div>
 
-<div id="bottom-nav" class="bottom-nav md:hidden"></div>
+<!-- ═══════════════════════════════════════════════════════
+     RESOLVE WORKFLOW MODAL — 3 steps
+═══════════════════════════════════════════════════════ -->
+<div id="resolve-modal" class="hidden fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xl p-6 scale-in max-h-[92vh] overflow-y-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-bold text-gray-900 dark:text-white">✅ Mark as Resolved</h2>
+      <button onclick="closeResolveModal()" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800">✕</button>
+    </div>
 
+    <!-- Issue preview -->
+    <div id="resolve-issue-preview" class="mb-5 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl"></div>
+
+    <!-- Step indicator -->
+    <div class="flex items-center gap-2 mb-5">
+      <div class="flex-1 h-1.5 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800">
+        <div id="resolve-step-bar" class="h-full rounded-full transition-all duration-500" style="width:100%;background:linear-gradient(90deg,#8b5cf6,#14b8a6)"></div>
+      </div>
+      <span id="resolve-step-label" class="text-xs font-bold text-violet-600 whitespace-nowrap">Submit Proof</span>
+    </div>
+
+    <!-- ── SINGLE STEP: Upload proof + resolution summary ── -->
+    <div id="resolve-step-1">
+      <div class="resolve-step active mb-5">
+        <div class="step-num">📸</div>
+        <div>
+          <p class="text-sm font-bold text-gray-900 dark:text-white">Upload Proof of Fix</p>
+          <p class="text-xs text-gray-500 mt-0.5">Photo + summary required. Citizens vote on the outcome — admin cannot decide.</p>
+        </div>
+      </div>
+
+      <!-- Upload area -->
+      <div id="proof-drop-zone" class="drop-zone p-6 text-center cursor-pointer mb-4" onclick="document.getElementById('proof-file').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleProofDrop(event)">
+        <input type="file" id="proof-file" accept="image/*" class="hidden" onchange="handleProofFile(this)"/>
+        <div id="proof-placeholder">
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style="background:linear-gradient(135deg,#ede9fe,#ccfbf1)">
+            <svg class="w-6 h-6 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">Click to upload proof photo</p>
+          <p class="text-xs text-gray-400 mt-1">JPEG, PNG — drag & drop supported</p>
+        </div>
+        <div id="proof-preview" class="hidden">
+          <img id="proof-img" class="photo-preview-img mb-2" alt="Proof"/>
+          <p class="text-xs text-teal-600 font-semibold">✓ Photo ready — click to change</p>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Resolution Summary <span class="text-rose-500">*</span></label>
+        <textarea id="resolve-summary" rows="2" placeholder="e.g. Pothole filled and road repaved by BBMP crew on 4 Apr 2026" class="form-input resize-none"></textarea>
+      </div>
+
+      <!-- What happens next — info box -->
+      <div class="mt-4 p-4 rounded-xl border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
+        <p class="text-xs font-bold text-amber-800 dark:text-amber-300 mb-2">🗳️ What happens after you submit</p>
+        <div class="space-y-1.5">
+          <div class="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <span class="font-bold mt-0.5">1.</span><span>Issue is marked <strong>"Awaiting Votes"</strong> — citizens who upvoted are notified to rate the fix</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <span class="font-bold mt-0.5">2.</span><span>Each citizen votes <strong>Satisfied ✅</strong> or <strong>Not Satisfied ❌</strong></span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <span class="font-bold mt-0.5">3.</span><span>If <strong>≥60% vote Satisfied</strong> → issue auto-resolves. Below 60% → marked Unsolved &amp; re-opened</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <span class="font-bold mt-0.5">⚠️</span><span><strong>Outcome is decided entirely by citizen votes.</strong> Admin cannot override.</span>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="submitResolveRequest()" class="btn-primary w-full justify-center mt-4 py-3">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+        Submit Proof &amp; Request Community Votes
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="bottom-nav" class="bottom-nav md:hidden"></div>
+<script src="js/api.js"></script>
 <script src="js/data.js"></script>
 <script src="js/components.js"></script>
 <script>
 let tableFilter='all', tableSearch='', progressIssueId=null, updateType='progress';
+let resolveIssueId=null, resolveProofDataUrl=null, resolveStep=1;
+let adminAnalytics = null;
 
-function checkAdminPin(){
-  const pin=document.getElementById('admin-pin').value;
-  if(pin==='1234'){
-    currentUser={name:'Admin',email:'admin@civicfix.com',isAdmin:true,uid:'admin1',avatar:'A',joinedAt:'2026-01-01'};
-    localStorage.setItem('civicUser',JSON.stringify(currentUser));
-    document.getElementById('admin-gate').classList.add('hidden');
-    document.getElementById('dashboard').classList.remove('hidden');
-    renderNavbar('admin.html');
-    renderBottomNav('admin.html');
-    initDashboard();
-    Toast.show('Welcome, Admin! 👑','success');
-  }else{
-    Toast.show('Incorrect PIN. Use: 1234','error');
-    const el=document.getElementById('admin-pin');
-    el.classList.add('border-red-500');
-    setTimeout(()=>el.classList.remove('border-red-500'),1000);
-  }
+// ── AUTH CHECK ────────────────────────────────────────────────────────
+async function loadAdminData(){
+  const [analytics, issues] = await Promise.all([
+    window.CivicAPI.fetchAdminAnalytics(),
+    window.CivicAPI.fetchAdminIssues(100)
+  ]);
+  adminAnalytics = analytics;
+  syncIssues(issues);
 }
 
+async function showDashboard(){
+  document.getElementById('dashboard').classList.remove('hidden');
+  renderNavbar('admin.html');
+  renderBottomNav('admin.html');
+  try{
+    await loadAdminData();
+  }catch(error){
+    Toast.show(error.message||'Could not load admin dashboard','error');
+  }
+  initDashboard();
+}
+
+document.addEventListener('DOMContentLoaded', async ()=>{
+  renderNavbar('admin.html');
+  renderBottomNav('admin.html');
+  if(window.CivicAPI.getToken()){
+    try{
+      currentUser = await window.CivicAPI.fetchCurrentUser();
+    }catch(_error){
+      currentUser = syncCurrentUser(null);
+    }
+  }
+  if(currentUser?.isAdmin){
+    showDashboard();
+  } else if(currentUser){
+    document.getElementById('not-admin-notice').classList.remove('hidden');
+  } else {
+    const gate=document.getElementById('admin-gate');
+    const input=document.getElementById('admin-pin');
+    const actionButton=gate?.querySelector('button');
+    const helperText=gate?.querySelector('p.text-xs');
+    const content=gate?.querySelector('.space-y-3');
+    if(input) input.classList.add('hidden');
+    if(helperText) helperText.textContent='Use an administrator account from the sign-in page.';
+    if(actionButton){
+      actionButton.textContent='Sign In';
+      actionButton.onclick=()=>{ window.location.href='auth.html'; };
+    }
+    if(content && !content.querySelector('[data-admin-login-copy]')){
+      const note=document.createElement('p');
+      note.dataset.adminLoginCopy='true';
+      note.className='text-sm text-gray-500 text-center';
+      note.textContent='Sign in with an admin account to access the dashboard.';
+      content.prepend(note);
+    }
+    gate.classList.remove('hidden');
+  }
+});
+
+// ── DASHBOARD INIT ────────────────────────────────────────────────────
 function initDashboard(){
+  const summary = adminAnalytics?.summary || {};
+  const chartSeries = {
+    labels: ['Open', 'Escalated', 'Progress', 'Review', 'Resolved'],
+    reported: [
+      Number(summary.pending || 0),
+      Number(summary.escalated || 0),
+      ISSUES.filter((issue) => issue.status === 'progress').length,
+      ISSUES.filter((issue) => issue.status === 'awaiting_review').length,
+      Number(summary.resolved || 0)
+    ],
+    resolved: [
+      0,
+      0,
+      0,
+      ISSUES.filter((issue) => issue.status === 'resolved').length,
+      Number(summary.resolved || 0)
+    ]
+  };
   animateCounters();
   renderBarChart();
-  renderDonutChart('donut-svg','donut-legend',ANALYTICS.categoryBreakdown.map(c=>({label:c.category,value:c.count,color:c.color})));
-  renderMiniBarChart('weekly-admin-chart',WEEKLY_DATA.labels,WEEKLY_DATA.reported,WEEKLY_DATA.resolved);
+  renderDonutChart('donut-svg','donut-legend',(adminAnalytics?.categoryBreakdown||ANALYTICS.categoryBreakdown).map((c,index)=>({label:c.category||c.label,value:c.count||c.value,color:c.color||['#6366f1','#f97316','#22c55e','#ef4444','#eab308','#14b8a6'][index%6]})));
+  renderMiniBarChart('monthly-admin-chart',chartSeries.labels,chartSeries.reported,chartSeries.resolved,'Current','Resolved');
+  renderVotePanel();
   renderTable();
 }
 
 function animateCounters(){
-  document.querySelectorAll('[data-target]').forEach(el=>{
-    const target=parseInt(el.dataset.target); let count=0;
+  const summary = adminAnalytics?.summary;
+  const values = summary ? [Number(summary.total||0), Number(summary.resolved||0), Number(summary.escalated||0), Number(summary.pending||0)] : null;
+  document.querySelectorAll('[data-target]').forEach((el,index)=>{
+    const target=values ? values[index] : parseInt(el.dataset.target); let count=0;
     const step=Math.max(1,Math.ceil(target/40));
     const iv=setInterval(()=>{count=Math.min(count+step,target);el.textContent=count;if(count>=target)clearInterval(iv);},30);
   });
 }
 
 function renderBarChart(){
-  const max=Math.max(...ANALYTICS.topAreas.map(a=>a.count));
-  const colors=['bg-violet-500','bg-purple-500','bg-pink-500','bg-orange-500','bg-yellow-500','bg-green-500'];
-  document.getElementById('bar-chart').innerHTML=ANALYTICS.topAreas.map((area,i)=>`
+  const topAreas = adminAnalytics?.topAreas || ANALYTICS.topAreas;
+  const max=Math.max(...topAreas.map(a=>a.count), 1);
+  const colors=['bg-violet-500','bg-purple-500','bg-pink-500','bg-orange-500','bg-yellow-500','bg-teal-500'];
+  document.getElementById('bar-chart').innerHTML=topAreas.map((area,i)=>`
     <div class="flex items-center gap-3">
       <div class="text-xs text-gray-500 dark:text-gray-400 w-28 flex-shrink-0">${area.area}</div>
       <div class="flex-1 h-7 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
@@ -259,9 +454,10 @@ function renderBarChart(){
   },200);
 }
 
+// ── TABLE ─────────────────────────────────────────────────────────────
 function filterTable(filter,btn){
   tableFilter=filter;
-  document.querySelectorAll('.table-filter-btn').forEach(b=>{b.className='table-filter-btn text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400';});
+  document.querySelectorAll('.table-filter-btn').forEach(b=>b.className='table-filter-btn text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400');
   btn.className='table-filter-btn active text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-600 text-white';
   renderTable();
 }
@@ -273,19 +469,75 @@ function getFilteredIssues(){
   else if(tableFilter==='pending') f=f.filter(i=>i.daysOpen>=10&&i.status!=='resolved');
   else if(tableFilter==='open') f=f.filter(i=>i.status==='open');
   else if(tableFilter==='progress') f=f.filter(i=>i.status==='progress');
+  else if(tableFilter==='review') f=f.filter(i=>i.status==='awaiting_review');
   if(tableSearch){const q=tableSearch.toLowerCase();f=f.filter(i=>i.title.toLowerCase().includes(q)||i.location.toLowerCase().includes(q));}
   return f.sort((a,b)=>b.heatScore-a.heatScore);
 }
 
+function renderVotePanel(){
+  const awaitingIssues = ISSUES.filter(i => i.status === 'awaiting_review');
+  const panel = document.getElementById('vote-panel');
+  const cards = document.getElementById('vote-panel-cards');
+  const countEl = document.getElementById('vote-panel-count');
+
+  if(awaitingIssues.length === 0){ panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  countEl.textContent = awaitingIssues.length + ' pending';
+
+  cards.innerHTML = awaitingIssues.map(issue => {
+    const tally = getVoteTally(issue.id);
+    const total = tally.satisfied + tally.notSatisfied;
+    const satPct = total > 0 ? Math.round((tally.satisfied / total) * 100) : 0;
+    const minVotes = Math.max(3, Math.floor(issue.upvotes * 0.05));
+    const remaining = Math.max(0, minVotes - total);
+    const barColor = satPct >= 60 ? 'bg-green-500' : total > 0 ? 'bg-red-400' : 'bg-gray-300';
+    const projection = total > 0 ? (satPct >= 60
+      ? `<span class="text-green-600 font-semibold">On track to resolve ✅</span>`
+      : `<span class="text-red-500 font-semibold">On track → Unsolved ❌</span>`)
+      : `<span class="text-gray-400">Awaiting first votes…</span>`;
+    return `
+    <div class="glass-card rounded-2xl p-4 border border-amber-200 dark:border-amber-800/40 hover:shadow-md transition-all cursor-pointer" onclick="window.location.href='issue.html?id=${issue.id}'">
+      <div class="flex items-start gap-3 mb-3">
+        <img src="${issue.image}" class="w-10 h-10 rounded-xl object-cover flex-shrink-0" onerror="this.src='https://placehold.co/40'"/>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">${issue.title}</p>
+          <p class="text-xs text-gray-400">${issue.location}</p>
+        </div>
+        <span class="badge bg-amber-100 text-amber-700 flex-shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Awaiting Votes</span>
+      </div>
+      <div class="flex justify-between text-xs font-semibold mb-1">
+        <span class="text-green-600">✅ ${tally.satisfied} satisfied</span>
+        <span class="text-gray-500 font-bold">${satPct}%</span>
+        <span class="text-red-500">❌ ${tally.notSatisfied} not satisfied</span>
+      </div>
+      <div class="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
+        <div class="h-full ${barColor} rounded-full transition-all duration-700" style="width:${satPct}%"></div>
+      </div>
+      <div class="flex items-center justify-between text-[11px] text-gray-400">
+        <span>${total} vote${total!==1?'s':''} cast · need ≥${minVotes} to decide</span>
+        ${remaining > 0 ? `<span class="text-amber-600 font-semibold">${remaining} more needed</span>` : `<span class="text-violet-600 font-semibold">Threshold reached!</span>`}
+      </div>
+      <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 text-[11px]">${projection}</div>
+      <div class="mt-2 text-[11px] text-gray-400">
+        <span class="font-semibold text-gray-600 dark:text-gray-300">60% threshold</span> · Admin cannot override · ${issue.upvotes} upvoters notified
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderTable(){
+  renderVotePanel();
   const filtered=getFilteredIssues();
   document.getElementById('table-count').textContent=`Showing ${filtered.length} of ${ISSUES.length} issues`;
-  if(filtered.length===0){document.getElementById('issues-table-body').innerHTML=`<tr><td colspan="7" class="px-4 py-12 text-center text-gray-400 text-sm">No issues match this filter</td></tr>`;return;}
+  if(filtered.length===0){
+    document.getElementById('issues-table-body').innerHTML=`<tr><td colspan="7" class="px-4 py-12 text-center text-gray-400 text-sm">No issues match this filter</td></tr>`;
+    return;
+  }
   document.getElementById('issues-table-body').innerHTML=filtered.map(issue=>{
     const heat=getHeatColor(issue.heatScore);
-    const status=STATUSES[issue.status];
+    const status=STATUSES[issue.status]||{label:issue.status,color:'',dot:''};
     const cat=getCategoryInfo(issue.category);
-    const avgRating=issue.reviews.length>0?Math.round(issue.reviews.reduce((s,r)=>s+r.rating,0)/issue.reviews.length):0;
+    const avgRating=issue.reviews.length>0?(issue.reviews.reduce((s,r)=>s+r.rating,0)/issue.reviews.length).toFixed(1):null;
     return `<tr class="table-row border-b border-gray-100 dark:border-gray-800" onclick="window.location.href='issue.html?id=${issue.id}'">
       <td class="px-4 py-3">
         <div class="flex items-center gap-3">
@@ -296,62 +548,73 @@ function renderTable(){
       <td class="px-4 py-3 hidden sm:table-cell"><span class="text-xs">${cat.icon} ${cat.label}</span></td>
       <td class="px-4 py-3"><span class="badge ${status.color}"><span class="w-1.5 h-1.5 rounded-full ${status.dot}"></span>${status.label}</span></td>
       <td class="px-4 py-3 hidden md:table-cell"><span class="text-xs font-bold ${heat.text} ${heat.light} px-2 py-0.5 rounded-full">🔥${issue.heatScore}</span></td>
-      <td class="px-4 py-3 hidden lg:table-cell"><span class="text-xs font-semibold ${issue.daysOpen>=10?'text-red-500':'text-gray-600 dark:text-gray-400'}">${issue.daysOpen}d</span></td>
-      <td class="px-4 py-3 hidden lg:table-cell">
-        <div class="flex items-center gap-1">
-          ${issue.progressUpdates.length>0?`<span class="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-1.5 py-0.5 rounded font-semibold">${issue.progressUpdates.length} updates</span>`:'<span class="text-[10px] text-gray-400">None</span>'}
-          ${issue.reviews.length>0?`<span class="text-[10px] bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 px-1.5 py-0.5 rounded font-semibold">${avgRating}⭐ (${issue.reviews.length})</span>`:''}
-        </div>
+      <td class="px-4 py-3 hidden lg:table-cell"><span class="text-xs font-semibold ${issue.daysOpen>=10?'text-rose-500':'text-gray-600 dark:text-gray-400'}">${issue.daysOpen}d</span></td>
+      <td class="px-4 py-3 hidden sm:table-cell">
+        ${(()=>{
+          // Show tally for awaiting_review AND for issues that were decided by vote (have vote data)
+          const tally=getVoteTally(issue.id);
+          const total=tally.satisfied+tally.notSatisfied;
+          if(issue.status==='awaiting_review' || (total>0 && (issue.status==='resolved'||issue.status==='unsolved'))){
+            const satPct=total>0?Math.round((tally.satisfied/total)*100):0;
+            const decided=issue.status==='resolved'||issue.status==='unsolved';
+            const barColor=satPct>=60?'bg-green-500':'bg-red-400';
+            const verdict=decided?(issue.status==='resolved'
+              ?`<span class="text-[10px] font-bold text-green-600">✅ Resolved by vote</span>`
+              :`<span class="text-[10px] font-bold text-red-500">❌ Unsolved by vote</span>`):'';
+            return `<div class="min-w-[90px]">
+              ${verdict?`<div class="mb-1">${verdict}</div>`:''}
+              <div class="flex justify-between text-[10px] font-semibold mb-0.5">
+                <span class="text-green-600">✅${tally.satisfied}</span>
+                <span class="text-gray-500 font-normal">${satPct}%</span>
+                <span class="text-red-500">❌${tally.notSatisfied}</span>
+              </div>
+              <div class="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div class="h-full ${barColor} rounded-full" style="width:${satPct}%"></div>
+              </div>
+              <p class="text-[10px] text-gray-400 mt-0.5">${total} vote${total!==1?'s':''} · 60% threshold</p>
+            </div>`;
+          }
+          return avgRating?`<span class="text-xs font-bold text-yellow-600">⭐${avgRating} <span class="text-gray-400 font-normal">(${issue.reviews.length})</span></span>`:'<span class="text-xs text-gray-400">—</span>';
+        })()}
       </td>
       <td class="px-4 py-3" onclick="event.stopPropagation()">
         <div class="flex items-center gap-1">
           <button onclick="openProgressModal(${issue.id})" title="Post Progress" class="w-7 h-7 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors text-xs">📢</button>
-          ${issue.status!=='resolved'?`<button onclick="quickAction(${issue.id},'resolve')" title="Resolve" class="w-7 h-7 flex items-center justify-center bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg hover:bg-green-200 transition-colors text-xs">✅</button>`:''}
-          ${issue.status==='open'?`<button onclick="quickAction(${issue.id},'escalate')" title="Escalate" class="w-7 h-7 flex items-center justify-center bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors text-xs">⚠️</button>`:''}
-          <a href="issue.html?id=${issue.id}" title="View" class="w-7 h-7 flex items-center justify-center bg-indigo-100 dark:bg-indigo-900/30 text-violet-600 rounded-lg hover:bg-violet-200 transition-colors text-xs">👁️</a>
+          ${issue.status!=='resolved'?`<button onclick="openResolveModal(${issue.id})" title="Resolve Workflow" class="w-7 h-7 flex items-center justify-center bg-teal-100 dark:bg-teal-900/30 text-teal-600 rounded-lg hover:bg-teal-200 transition-colors text-xs">✅</button>`:''}
+          ${issue.status==='open'?`<button onclick="quickEscalate(${issue.id})" title="Escalate" class="w-7 h-7 flex items-center justify-center bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors text-xs">⚠️</button>`:''}
+          <a href="issue.html?id=${issue.id}" title="View" class="w-7 h-7 flex items-center justify-center bg-violet-100 dark:bg-violet-900/30 text-violet-600 rounded-lg hover:bg-violet-200 transition-colors text-xs">👁️</a>
         </div>
       </td>
     </tr>`;
   }).join('');
 }
 
-function quickAction(id,action){
-  const issue=ISSUES.find(i=>i.id===id);if(!issue)return;
-  if(action==='resolve'){
-    openProgressModal(id,'resolved');
-  }else{
-    issue.status='escalated';
-    Toast.show(`Issue #${id} escalated ⚠️`,'warning');
-    renderTable();
-  }
+function quickEscalate(id){
+  openProgressModal(id);
+  setTimeout(()=>{
+    const btn=document.querySelectorAll('.update-type-btn')[1];
+    if(btn) setUpdateType('escalated', btn);
+  },50);
 }
 
-function openProgressModal(id, forcedType=null){
-  progressIssueId=id;
+// ── PROGRESS MODAL (non-resolve) ──────────────────────────────────────
+function openProgressModal(id){
+  progressIssueId=id; updateType='progress';
   const issue=ISSUES.find(i=>i.id===id);if(!issue)return;
-  updateType=forcedType||'progress';
-  // Highlight the right type button
-  document.querySelectorAll('.update-type-btn').forEach(b=>b.classList.remove('selected','border-violet-500','bg-violet-50','dark:bg-indigo-900/20'));
-  const mapping={progress:0,escalated:1,resolved:2};
+  document.querySelectorAll('.update-type-btn').forEach((b,idx)=>{
+    b.classList.remove('selected','border-violet-500','bg-violet-50','dark:bg-violet-900/20','border-orange-400','bg-orange-50');
+    b.classList.add('border-gray-200','dark:border-gray-700');
+  });
   const btns=document.querySelectorAll('.update-type-btn');
-  if(btns[mapping[updateType]]){btns[mapping[updateType]].classList.add('selected','border-violet-500','bg-violet-50','dark:bg-indigo-900/20');}
-  document.getElementById('resolve-section').classList.toggle('hidden',updateType!=='resolved');
-  // Preview
+  if(btns[0])btns[0].classList.add('selected','border-violet-500','bg-violet-50','dark:bg-violet-900/20');
   document.getElementById('progress-issue-preview').innerHTML=`
     <div class="flex items-center gap-3">
-      <img src="${issue.image}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0" onerror="this.src='https://placehold.co/40'"/>
+      <img src="${issue.image}" class="w-10 h-10 rounded-lg object-cover" onerror="this.src='https://placehold.co/40'"/>
       <div class="flex-1 min-w-0"><p class="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">${issue.title}</p><p class="text-xs text-gray-500">${issue.location} · 🔥${issue.heatScore}</p></div>
-      <span class="badge ${STATUSES[issue.status].color}">${STATUSES[issue.status].label}</span>
+      <span class="badge ${STATUSES[issue.status]?.color||''}">${STATUSES[issue.status]?.label||issue.status}</span>
     </div>`;
-  // Existing updates
   const eu=document.getElementById('existing-updates');
-  if(issue.progressUpdates.length>0){
-    eu.innerHTML=`<div class="mb-3"><p class="text-xs font-semibold text-gray-500 mb-2">PREVIOUS UPDATES</p><div class="space-y-2">${issue.progressUpdates.map(u=>`
-      <div class="progress-card bg-blue-50 dark:bg-blue-950/20 rounded-xl p-3">
-        <p class="text-xs font-semibold text-gray-900 dark:text-white mb-0.5">${u.admin} — ${u.date}</p>
-        <p class="text-xs text-gray-600 dark:text-gray-400">${u.text}</p>
-      </div>`).join('')}</div></div>`;
-  } else eu.innerHTML='';
+  eu.innerHTML=issue.progressUpdates.length>0?`<div class="mb-3"><p class="text-xs font-semibold text-gray-500 mb-2">PREVIOUS UPDATES (${issue.progressUpdates.length})</p><div class="space-y-2 max-h-32 overflow-y-auto">${issue.progressUpdates.map(u=>`<div class="progress-card bg-violet-50 dark:bg-violet-950/20 rounded-xl p-3"><p class="text-xs font-semibold text-gray-900 dark:text-white mb-0.5">${u.admin} — ${u.date}</p><p class="text-xs text-gray-600 dark:text-gray-400">${u.text}</p></div>`).join('')}</div></div>`:'';
   document.getElementById('progress-text').value='';
   document.getElementById('eta-date').value='';
   document.getElementById('progress-modal').classList.remove('hidden');
@@ -359,63 +622,105 @@ function openProgressModal(id, forcedType=null){
 
 function setUpdateType(type,btn){
   updateType=type;
-  document.querySelectorAll('.update-type-btn').forEach(b=>{b.classList.remove('selected','border-violet-500','border-orange-400','border-green-400','bg-violet-50','bg-orange-50','bg-green-50','dark:bg-indigo-900/20','dark:bg-orange-900/20','dark:bg-green-900/20');b.classList.add('border-gray-200','dark:border-gray-700');});
+  document.querySelectorAll('.update-type-btn').forEach(b=>{b.classList.remove('selected','border-violet-500','border-orange-400','bg-violet-50','bg-orange-50','dark:bg-violet-900/20','dark:bg-orange-900/20');b.classList.add('border-gray-200','dark:border-gray-700');});
   btn.classList.remove('border-gray-200','dark:border-gray-700');
-  if(type==='progress') btn.classList.add('selected','border-violet-500','bg-violet-50','dark:bg-indigo-900/20');
-  else if(type==='escalated') btn.classList.add('selected','border-orange-400','bg-orange-50','dark:bg-orange-900/20');
-  else btn.classList.add('selected','border-green-400','bg-green-50','dark:bg-green-900/20');
-  document.getElementById('resolve-section').classList.toggle('hidden',type!=='resolved');
+  if(type==='progress') btn.classList.add('selected','border-violet-500','bg-violet-50','dark:bg-violet-900/20');
+  else btn.classList.add('selected','border-orange-400','bg-orange-50','dark:bg-orange-900/20');
 }
 
-function submitProgressUpdate(){
+async function submitProgressUpdate(){
   const text=document.getElementById('progress-text').value.trim();
   if(!text){Toast.show('Please enter an update message','warning');return;}
-  const issue=ISSUES.find(i=>i.id===progressIssueId);if(!issue)return;
-  const update={date:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),text,admin:currentUser.name||'Admin'};
-  issue.progressUpdates.push(update);
-  issue.status=updateType;
-  // Update timeline
-  const mapping={'progress':'In Progress','escalated':'Escalated','resolved':'Resolved'};
-  const tEvent=issue.timeline.find(t=>t.event===mapping[updateType]||t.event.toLowerCase().includes(updateType.toLowerCase()));
-  if(tEvent){tEvent.done=true;tEvent.date=update.date;}
-  // Add notifications for users
-  userNotifs.unshift({
-    id:Date.now(),type:updateType==='resolved'?'resolved':updateType==='escalated'?'escalated':'progress',
-    icon:updateType==='resolved'?'✅':updateType==='escalated'?'⚠️':'🔧',
-    title:updateType==='resolved'?'Issue Resolved!':updateType==='escalated'?'Issue Escalated':'Progress Update',
-    body:`${issue.title.substring(0,50)}… — ${text.substring(0,60)}`,
-    time:'Just now',read:false,issueId:issue.id
-  });
-  // If resolved → add review request notification
-  if(updateType==='resolved'){
-    userNotifs.unshift({
-      id:Date.now()+1,type:'review',icon:'⭐',
-      title:'Share your experience',
-      body:`The issue "${issue.title.substring(0,40)}…" has been fixed. How was it?`,
-      time:'Just now',read:false,issueId:issue.id
+  try{
+    const updatedIssue = await window.CivicAPI.postAdminUpdate(progressIssueId,{
+      updateType,
+      message:text,
+      etaDate:document.getElementById('eta-date').value || null
     });
+    const index=ISSUES.findIndex(i=>i.id===progressIssueId);
+    if(index>=0) ISSUES[index]=updatedIssue;
+    closeProgressModal();
+    renderTable();
+    Toast.show(`Update posted! Status → "${STATUSES[updateType]?.label||updateType}" 📢`,'success',3000);
+  }catch(error){
+    Toast.show(error.message||'Could not post update','error');
   }
-  saveNotifs();
-  closeProgressModal();
-  renderTable();
-  Toast.show(`Update posted! Status changed to "${STATUSES[updateType].label}" 📢`,'success',3000);
 }
 
 function closeProgressModal(){document.getElementById('progress-modal').classList.add('hidden');}
 
-function exportData(){
-  const data=ISSUES.map(i=>`${i.id},"${i.title}",${i.status},${i.heatScore},"${i.location}",${i.daysOpen},${i.upvotes},${i.progressUpdates.length} updates,${i.reviews.length} reviews`).join('\n');
-  const blob=new Blob([`ID,Title,Status,Heat Score,Location,Days Pending,Upvotes,Progress Updates,Reviews\n${data}`],{type:'text/csv'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='civicfix-admin-export.csv';a.click();
-  Toast.show('Exported as CSV!','success');
+// ── RESOLVE WORKFLOW ──────────────────────────────────────────────────
+function openResolveModal(id){
+  resolveIssueId=id; resolveProofDataUrl=null;
+  const issue=ISSUES.find(i=>i.id===id);if(!issue)return;
+  document.getElementById('resolve-step-bar').style.width='100%';
+  document.getElementById('resolve-step-label').textContent='Upload Proof';
+  document.getElementById('proof-placeholder').classList.remove('hidden');
+  document.getElementById('proof-preview').classList.add('hidden');
+  document.getElementById('resolve-summary').value='';
+  document.getElementById('proof-file').value='';
+  resolveProofDataUrl=null;
+  document.getElementById('resolve-issue-preview').innerHTML=`
+    <div class="flex items-center gap-3">
+      <img src="${issue.image}" class="w-12 h-12 rounded-xl object-cover" onerror="this.src='https://placehold.co/48'"/>
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-gray-900 dark:text-white line-clamp-1">${issue.title}</p>
+        <p class="text-xs text-gray-500">${issue.location} · 🔥${issue.heatScore} · ${issue.upvotes} upvotes</p>
+      </div>
+      <span class="badge ${STATUSES[issue.status]?.color||''}">${STATUSES[issue.status]?.label||issue.status}</span>
+    </div>`;
+  document.getElementById('resolve-modal').classList.remove('hidden');
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
-  renderNavbar('admin.html');
-  renderBottomNav('admin.html');
-  if(currentUser?.isAdmin){document.getElementById('dashboard').classList.remove('hidden');initDashboard();}
-  else{document.getElementById('admin-gate').classList.remove('hidden');}
-});
+function handleProofFile(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    resolveProofDataUrl=e.target.result;
+    document.getElementById('proof-img').src=resolveProofDataUrl;
+    document.getElementById('proof-placeholder').classList.add('hidden');
+    document.getElementById('proof-preview').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleProofDrop(e){
+  e.preventDefault();
+  document.getElementById('proof-drop-zone').classList.remove('drag-over');
+  const file=e.dataTransfer.files[0];if(!file||!file.type.startsWith('image/'))return;
+  const dt=new DataTransfer();dt.items.add(file);
+  document.getElementById('proof-file').files=dt.files;
+  handleProofFile(document.getElementById('proof-file'));
+}
+
+async function submitResolveRequest(){
+  const summary=document.getElementById('resolve-summary').value.trim();
+  if(!resolveProofDataUrl){Toast.show('Please upload a proof photo first','warning');return;}
+  if(!summary){Toast.show('Please enter a resolution summary','warning');return;}
+  try{
+    const updatedIssue = await window.CivicAPI.submitResolveRequest(resolveIssueId,{
+      summary,
+      proofImageUrl:resolveProofDataUrl
+    });
+    const index=ISSUES.findIndex(i=>i.id===resolveIssueId);
+    if(index>=0) ISSUES[index]=updatedIssue;
+    closeResolveModal();
+    renderTable();
+    Toast.show(`Proof submitted! Vote request sent to upvoters 🗳️`, 'success', 4000);
+  }catch(error){
+    Toast.show(error.message||'Could not submit proof','error');
+  }
+}
+
+function closeResolveModal(){document.getElementById('resolve-modal').classList.add('hidden');}
+
+// ── EXPORT ────────────────────────────────────────────────────────────
+function exportData(){
+  const data=ISSUES.map(i=>`${i.id},"${i.title}",${i.status},${i.heatScore},"${i.location}",${i.daysOpen},${i.upvotes},${i.progressUpdates.length},${i.reviews.length}`).join('\n');
+  const blob=new Blob([`ID,Title,Status,Heat Score,Location,Days Pending,Upvotes,Progress Updates,Reviews\n${data}`],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='civicfix-export.csv';a.click();
+  Toast.show('Exported as CSV!','success');
+}
 </script>
 </body>
 </html>

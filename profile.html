@@ -130,14 +130,16 @@
       <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Phone</label><input type="tel" id="edit-phone" placeholder="+91 xxxxx xxxxx" class="form-input"/></div>
       <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Area / Locality</label>
         <div class="flex gap-2">
-          <input type="text" id="edit-location" placeholder="e.g. Koramangala, Bengaluru" class="form-input flex-1"/>
+          <input type="text" id="edit-location" placeholder="Area, city or coordinates" class="form-input flex-1"/>
           <button type="button" onclick="refreshLocation()" class="btn-secondary px-3">📍</button>
         </div>
       </div>
       <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Notification Preferences</label>
         <div class="space-y-2">
-          ${[['Notify when my issue gets upvoted','notif-upvote'],['Notify on progress updates','notif-progress'],['Notify when issue is resolved','notif-resolved'],['Notify on nearby issues','notif-nearby']].map(([l,id])=>`
-          <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="${id}" checked class="accent-indigo-600 rounded w-4 h-4"/><span class="text-sm text-gray-600 dark:text-gray-400">${l}</span></label>`).join('')}
+          <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="notif-upvote" checked class="accent-indigo-600 rounded w-4 h-4"/><span class="text-sm text-gray-600 dark:text-gray-400">Notify when my issue gets upvoted</span></label>
+          <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="notif-progress" checked class="accent-indigo-600 rounded w-4 h-4"/><span class="text-sm text-gray-600 dark:text-gray-400">Notify on progress updates</span></label>
+          <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="notif-resolved" checked class="accent-indigo-600 rounded w-4 h-4"/><span class="text-sm text-gray-600 dark:text-gray-400">Notify when issue is resolved</span></label>
+          <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="notif-nearby" checked class="accent-indigo-600 rounded w-4 h-4"/><span class="text-sm text-gray-600 dark:text-gray-400">Notify on nearby issues</span></label>
         </div>
       </div>
     </div>
@@ -150,13 +152,29 @@
 
 <div id="bottom-nav" class="bottom-nav md:hidden"></div>
 
+<script src="js/api.js"></script>
 <script src="js/data.js"></script>
 <script src="js/components.js"></script>
 <script>
 let activeProfileTab = 'reported';
+let profileSummary = null;
+const profileIssueLists = { reported: [], upvoted: [], resolved: [] };
 
 function renderProfileContent() {
   const user = currentUser;
+  const activityData = {
+    labels: ['Reported', 'Upvoted', 'Resolved'],
+    reported: [
+      profileIssueLists.reported.length,
+      profileIssueLists.upvoted.length,
+      profileIssueLists.resolved.length
+    ],
+    resolved: [
+      profileIssueLists.reported.filter((issue) => issue.status === 'resolved').length,
+      profileIssueLists.upvoted.filter((issue) => issue.status === 'resolved').length,
+      profileIssueLists.resolved.length
+    ]
+  };
   document.getElementById('avatar').textContent = user.avatar || user.name.charAt(0).toUpperCase();
   document.getElementById('user-name').textContent = user.name;
   document.getElementById('user-email').textContent = user.email || '';
@@ -168,18 +186,19 @@ function renderProfileContent() {
   }
 
   // Stats
-  const myIssues = ISSUES.filter(i => userReportedIds.includes(i.id));
-  const resolved = myIssues.filter(i => i.status === 'resolved').length;
-  const totalUpvotes = myIssues.reduce((s,i) => s+i.upvotes, 0);
-  const impact = myIssues.length * 12 + upvotedIssues.size * 3 + resolved * 25;
-  animateCount('stat-reported', myIssues.length || userReportedIds.length || 3);
-  animateCount('stat-resolved', resolved || 1);
-  animateCount('stat-upvotes', totalUpvotes || 47);
-  animateCount('stat-impact', impact || 89);
+  const stats = profileSummary?.stats || { reportedCount:0, resolvedCount:0, totalUpvotes:0, impactScore:0 };
+  animateCount('stat-reported', stats.reportedCount);
+  animateCount('stat-resolved', stats.resolvedCount);
+  animateCount('stat-upvotes', stats.totalUpvotes);
+  animateCount('stat-impact', stats.impactScore);
 
   // Charts
-  renderMiniBarChart('profile-bar-chart', MONTHLY_DATA.labels, MONTHLY_DATA.reported.map(v=>Math.floor(v/10)), MONTHLY_DATA.resolved.map(v=>Math.floor(v/10)), 'Reported','Resolved');
-  const catData = CATEGORIES.slice(0,5).map((c,i)=>({label:c.label,value:[3,2,4,1,2][i],color:['#6366f1','#f97316','#22c55e','#ef4444','#eab308'][i]}));
+  renderMiniBarChart('profile-bar-chart', activityData.labels, activityData.reported, activityData.resolved, 'Items','Resolved');
+  const catData = (profileSummary?.categoryBreakdown || []).slice(0,5).map((c,i)=>({
+    label: getCategoryInfo(c.category).label,
+    value: c.count,
+    color: ['#6366f1','#f97316','#22c55e','#ef4444','#eab308'][i % 5]
+  }));
   renderDonutChart('cat-donut','cat-legend',catData);
 
   renderTab('reported');
@@ -203,7 +222,7 @@ function switchTab(tab, btn) {
 function renderTab(tab) {
   const content = document.getElementById('tab-content');
   if (tab === 'reported') {
-    const myIssues = ISSUES.filter(i => userReportedIds.includes(i.id));
+    const myIssues = profileIssueLists.reported;
     if (myIssues.length === 0) {
       content.innerHTML = `<div class="text-center py-16">
         <div class="text-5xl mb-3">📝</div>
@@ -215,14 +234,14 @@ function renderTab(tab) {
     }
     content.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">${myIssues.map(i=>IssueCard(i)).join('')}</div>`;
   } else if (tab === 'upvoted') {
-    const upvoted = ISSUES.filter(i => upvotedIssues.has(i.id));
+    const upvoted = profileIssueLists.upvoted;
     if (upvoted.length === 0) {
       content.innerHTML = `<div class="text-center py-16"><div class="text-5xl mb-3">👍</div><h3 class="font-semibold text-gray-700 dark:text-gray-300 mb-1">No upvoted issues</h3><p class="text-sm text-gray-500">Upvote issues to see them here.</p></div>`;
       return;
     }
     content.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">${upvoted.map(i=>IssueCard(i)).join('')}</div>`;
   } else if (tab === 'resolved') {
-    const resolved = ISSUES.filter(i => (userReportedIds.includes(i.id) || upvotedIssues.has(i.id)) && i.status==='resolved');
+    const resolved = profileIssueLists.resolved;
     if (resolved.length === 0) {
       const samp = ISSUES.filter(i=>i.status==='resolved');
       content.innerHTML = `<div class="space-y-3">${samp.map(i=>`
@@ -279,37 +298,94 @@ function renderTab(tab) {
 
 function showEditModal() {
   document.getElementById('edit-name').value = currentUser.name || '';
+  document.getElementById('edit-phone').value = currentUser.phone || '';
   document.getElementById('edit-location').value = userLocation?.full || userLocation?.area || '';
+  document.getElementById('notif-upvote').checked = currentUser.notifyUpvote ?? true;
+  document.getElementById('notif-progress').checked = currentUser.notifyProgress ?? true;
+  document.getElementById('notif-resolved').checked = currentUser.notifyResolved ?? true;
+  document.getElementById('notif-nearby').checked = currentUser.notifyNearby ?? true;
   document.getElementById('edit-modal').classList.remove('hidden');
 }
 function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); }
 function saveProfile() {
   const name = document.getElementById('edit-name').value.trim();
+  const phone = document.getElementById('edit-phone').value.trim();
   const loc = document.getElementById('edit-location').value.trim();
-  if (name) { currentUser.name = name; localStorage.setItem('civicUser', JSON.stringify(currentUser)); }
-  if (loc && userLocation) { userLocation.full = loc; saveLocation(userLocation); }
-  closeEditModal();
-  Toast.show('Profile updated!', 'success');
-  renderProfileContent();
+  const parts = name.split(' ');
+  const locationParts = loc.split(',').map((part) => part.trim()).filter(Boolean);
+  const area = locationParts[0] || null;
+  const city = locationParts[1] || currentUser.city || 'Bengaluru';
+  window.CivicAPI.updateProfile({
+    firstName: parts[0] || currentUser.firstName || currentUser.name,
+    lastName: parts.slice(1).join(' ') || currentUser.lastName || '',
+    phone: phone || null,
+    area,
+    city,
+    lat: userLocation?.lat ?? currentUser.lat ?? null,
+    lng: userLocation?.lng ?? currentUser.lng ?? null,
+    notifyUpvote: document.getElementById('notif-upvote').checked,
+    notifyProgress: document.getElementById('notif-progress').checked,
+    notifyResolved: document.getElementById('notif-resolved').checked,
+    notifyNearby: document.getElementById('notif-nearby').checked
+  }).then((user)=>{
+    currentUser = syncCurrentUser(user);
+    if (loc) {
+      saveLocation({
+        lat: userLocation?.lat ?? user.lat ?? null,
+        lng: userLocation?.lng ?? user.lng ?? null,
+        area: user.area || area,
+        city: user.city || city,
+        full: loc
+      });
+    }
+    closeEditModal();
+    Toast.show('Profile updated!', 'success');
+    renderProfileContent();
+  }).catch((error)=>Toast.show(error.message||'Could not update profile','error'));
 }
 function refreshLocation() {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(pos => {
-      const AREAS=['Koramangala','Indiranagar','HSR Layout','Whitefield','Electronic City'];
-      const area=AREAS[Math.floor(Math.random()*AREAS.length)];
-      saveLocation({lat:pos.coords.latitude,lng:pos.coords.longitude,area,city:'Bengaluru',full:`${area}, Bengaluru`});
-      document.getElementById('edit-location').value=`${area}, Bengaluru`;
-      Toast.show(`Location updated to ${area}! 📍`,'success');
+      const lat = Number(pos.coords.latitude.toFixed(5));
+      const lng = Number(pos.coords.longitude.toFixed(5));
+      const full = `Lat ${lat}, Lng ${lng}`;
+      saveLocation({lat, lng, area: null, city:'Bengaluru', full});
+      document.getElementById('edit-location').value=full;
+      Toast.show('Location updated','success');
     },()=>Toast.show('Location access denied','warning'));
   }
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
+async function loadProfileData(){
+  const [summary, reported, upvoted, resolved] = await Promise.all([
+    window.CivicAPI.fetchProfileSummary(),
+    window.CivicAPI.fetchProfileIssues('reported'),
+    window.CivicAPI.fetchProfileIssues('upvoted'),
+    window.CivicAPI.fetchProfileIssues('resolved')
+  ]);
+  profileSummary = summary;
+  profileIssueLists.reported = reported;
+  profileIssueLists.upvoted = upvoted;
+  profileIssueLists.resolved = resolved;
+  syncIssues([...reported, ...upvoted, ...resolved].filter((issue, index, arr)=>arr.findIndex((i)=>i.id===issue.id)===index));
+  currentUser = syncCurrentUser(summary.user);
+}
+
+document.addEventListener('DOMContentLoaded', async ()=>{
   renderNavbar('profile.html');
   renderBottomNav('profile.html');
   if (!currentUser) { document.getElementById('guest-state').classList.remove('hidden'); }
-  else { document.getElementById('profile-content').classList.remove('hidden'); renderProfileContent(); }
+  else {
+    document.getElementById('profile-content').classList.remove('hidden');
+    try{
+      await loadProfileData();
+      renderProfileContent();
+    }catch(error){
+      Toast.show(error.message||'Could not load profile','error');
+    }
+  }
 });
 </script>
 </body>
 </html>
+

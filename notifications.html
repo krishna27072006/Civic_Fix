@@ -21,6 +21,7 @@
   <div class="flex gap-2 mb-5 overflow-x-auto pb-1">
     <button onclick="filterNotifs('all',this)" class="notif-filter-btn flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-violet-600 text-white transition-all">All</button>
     <button onclick="filterNotifs('unread',this)" class="notif-filter-btn flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 transition-all">Unread</button>
+    <button onclick="filterNotifs('vote_request',this)" class="notif-filter-btn flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 transition-all">🗳️ Vote</button>
     <button onclick="filterNotifs('progress',this)" class="notif-filter-btn flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 transition-all">🔧 Updates</button>
     <button onclick="filterNotifs('upvote',this)" class="notif-filter-btn flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 transition-all">👍 Upvotes</button>
     <button onclick="filterNotifs('nearby',this)" class="notif-filter-btn flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 transition-all">📍 Nearby</button>
@@ -29,65 +30,100 @@
   <div id="notif-list" class="space-y-2 stagger-children"></div>
 </main>
 
-<!-- Review Modal -->
-<div id="review-modal" class="hidden fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+<!-- Vote Modal -->
+<div id="vote-modal" class="hidden fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
   <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 scale-in">
-    <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1">Share Your Experience</h2>
-    <p class="text-sm text-gray-500 mb-4">How was the resolution of this issue?</p>
-    <div id="review-issue-preview" class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl"></div>
-    <!-- Stars -->
-    <div class="flex gap-2 justify-center mb-4" id="star-rating">
-      ${[1,2,3,4,5].map(n=>`<button type="button" onclick="setRating(${n})" class="star-btn text-3xl text-gray-300 hover:text-yellow-400 transition-colors" data-star="${n}">★</button>`).join('')}
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="text-lg font-bold text-gray-900 dark:text-white">Cast Your Vote</h2>
+      <button onclick="document.getElementById('vote-modal').classList.add('hidden')" class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">✕</button>
     </div>
-    <div>
-      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Your feedback</label>
-      <textarea id="review-text" rows="3" placeholder="How was the fix? Was it done properly?" class="form-input resize-none"></textarea>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Has this issue been satisfactorily resolved? Your vote decides the outcome.</p>
+    <div id="vote-issue-preview" class="mb-5 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl"></div>
+    <!-- Proof photo if set -->
+    <div id="vote-proof-wrap" class="hidden mb-4">
+      <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">📸 Resolution Proof from Admin</p>
+      <img id="vote-proof-img" src="" class="w-full rounded-xl object-cover max-h-48" alt="Proof photo"/>
     </div>
-    <div class="flex gap-3 mt-4">
-      <button onclick="document.getElementById('review-modal').classList.add('hidden')" class="btn-secondary flex-1 justify-center">Skip</button>
-      <button onclick="submitReview()" class="btn-primary flex-1 justify-center">Submit Review</button>
+    <!-- Tally bar (shown after voting) -->
+    <div id="vote-tally-wrap" class="hidden mb-5">
+      <div class="flex justify-between text-xs font-semibold mb-1">
+        <span class="text-green-600" id="vote-tally-sat-pct">0% Satisfied</span>
+        <span class="text-red-500" id="vote-tally-nosat-pct">0% Not Satisfied</span>
+      </div>
+      <div class="w-full h-3 bg-red-200 dark:bg-red-900/40 rounded-full overflow-hidden">
+        <div id="vote-tally-bar" class="h-full bg-green-500 rounded-full transition-all duration-500" style="width:0%"></div>
+      </div>
+      <p class="text-[11px] text-gray-400 mt-1.5 text-center" id="vote-tally-meta"></p>
+    </div>
+    <!-- Vote buttons or already-voted state -->
+    <div id="vote-btn-area">
+      <div class="grid grid-cols-2 gap-3">
+        <button onclick="castVote(true)" class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:border-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 transition-all group">
+          <span class="text-4xl">✅</span>
+          <span class="text-sm font-bold text-green-700 dark:text-green-400">Satisfied</span>
+          <span class="text-[11px] text-gray-500 text-center">Issue is fixed properly</span>
+        </button>
+        <button onclick="castVote(false)" class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 hover:border-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all group">
+          <span class="text-4xl">❌</span>
+          <span class="text-sm font-bold text-red-600 dark:text-red-400">Not Satisfied</span>
+          <span class="text-[11px] text-gray-500 text-center">Issue still not resolved</span>
+        </button>
+      </div>
+      <p class="text-[11px] text-gray-400 text-center mt-3">≥60% satisfied votes → auto-resolved · &lt;60% → marked unsolved</p>
+    </div>
+    <div id="vote-already-voted" class="hidden text-center py-2">
+      <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">You've already voted ✓</p>
+      <p class="text-xs text-gray-400 mt-0.5">Results update as more votes come in.</p>
     </div>
   </div>
 </div>
 
 <div id="bottom-nav" class="bottom-nav md:hidden"></div>
 
+<script src="js/api.js"></script>
 <script src="js/data.js"></script>
 <script src="js/components.js"></script>
 <script>
 let notifFilter = 'all';
-let selectedRating = 0;
-let reviewIssueId = null;
+let voteIssueId = null;
+let notificationsStore = [];
 
 const NOTIF_ICONS = {
-  progress:  { bg:'bg-blue-100 dark:bg-blue-900/30',   icon:'bg-blue-500'   },
-  upvote:    { bg:'bg-indigo-100 dark:bg-indigo-900/30',icon:'bg-violet-500' },
-  escalated: { bg:'bg-orange-100 dark:bg-orange-900/30',icon:'bg-orange-500' },
-  resolved:  { bg:'bg-green-100 dark:bg-green-900/30',  icon:'bg-green-500'  },
-  nearby:    { bg:'bg-teal-100 dark:bg-teal-900/30',    icon:'bg-teal-500'   },
-  review:    { bg:'bg-yellow-100 dark:bg-yellow-900/30',icon:'bg-yellow-500' },
-  submitted: { bg:'bg-purple-100 dark:bg-purple-900/30',icon:'bg-purple-500' },
+  progress:     { bg:'bg-blue-100 dark:bg-blue-900/30',    icon:'bg-blue-500'    },
+  upvote:       { bg:'bg-indigo-100 dark:bg-indigo-900/30', icon:'bg-violet-500' },
+  escalated:    { bg:'bg-orange-100 dark:bg-orange-900/30', icon:'bg-orange-500' },
+  resolved:     { bg:'bg-green-100 dark:bg-green-900/30',   icon:'bg-green-500'  },
+  nearby:       { bg:'bg-teal-100 dark:bg-teal-900/30',     icon:'bg-teal-500'   },
+  review:       { bg:'bg-yellow-100 dark:bg-yellow-900/30', icon:'bg-yellow-500' },
+  submitted:    { bg:'bg-purple-100 dark:bg-purple-900/30', icon:'bg-purple-500' },
+  vote_request: { bg:'bg-violet-100 dark:bg-violet-900/30', icon:'bg-violet-600' },
 };
 
 function getFilteredNotifs() {
-  if (notifFilter === 'all') return userNotifs;
-  if (notifFilter === 'unread') return userNotifs.filter(n => !n.read);
-  return userNotifs.filter(n => n.type === notifFilter);
+  if (notifFilter === 'all') return notificationsStore;
+  if (notifFilter === 'unread') return notificationsStore.filter(n => !n.read);
+  return notificationsStore.filter(n => n.type === notifFilter);
 }
 
 function renderNotifList() {
   const filtered = getFilteredNotifs();
-  const unread = userNotifs.filter(n=>!n.read).length;
-  document.getElementById('notif-sub').textContent = unread > 0 ? `${unread} unread notification${unread>1?'s':''}` : 'All caught up ✓';
+  const unread = notificationsStore.filter(n=>!n.read).length;
+  document.getElementById('notif-sub').textContent =
+    unread > 0 ? `${unread} unread notification${unread>1?'s':''}` : 'All caught up ✓';
 
   if (filtered.length === 0) {
-    document.getElementById('notif-list').innerHTML = `<div class="text-center py-16"><div class="text-5xl mb-3">🔔</div><h3 class="font-semibold text-gray-700 dark:text-gray-300 mb-1">No notifications here</h3><p class="text-sm text-gray-500">Check back later.</p></div>`;
+    document.getElementById('notif-list').innerHTML =
+      `<div class="text-center py-16"><div class="text-5xl mb-3">🔔</div>
+       <h3 class="font-semibold text-gray-700 dark:text-gray-300 mb-1">No notifications here</h3>
+       <p class="text-sm text-gray-500">Check back later.</p></div>`;
     return;
   }
 
   document.getElementById('notif-list').innerHTML = filtered.map(n => {
     const style = NOTIF_ICONS[n.type] || NOTIF_ICONS.progress;
     const issue = n.issueId ? ISSUES.find(i=>i.id===n.issueId) : null;
+    const isVote = n.type === 'vote_request';
+
     return `
       <div class="notif-item ${n.read?'':'unread'} rounded-2xl p-4 flex items-start gap-3 cursor-pointer transition-all hover:shadow-md"
            onclick="handleNotifClick(${n.id},${n.issueId||'null'},'${n.type}')">
@@ -102,10 +138,15 @@ function renderNotifList() {
           </div>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">${n.body}</p>
           ${issue ? `<div class="flex items-center gap-2 mt-2 flex-wrap">
-            <span class="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">${getCategoryInfo(issue.category).icon} ${getCategoryInfo(issue.category).label}</span>
-            <span class="text-[10px] ${getHeatColor(issue.heatScore).light} ${getHeatColor(issue.heatScore).text} px-2 py-0.5 rounded-full font-semibold">🔥 ${issue.heatScore}</span>
-            ${n.type==='review'?`<button onclick="event.stopPropagation();openReview(${issue.id})" class="text-[10px] bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 px-2 py-0.5 rounded-full font-semibold hover:bg-yellow-200 transition-colors">⭐ Leave Review</button>`:''}
-          </div>` : ''}
+            <span class="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">
+              ${getCategoryInfo(issue.category).icon} ${getCategoryInfo(issue.category).label}
+            </span>
+            <span class="text-[10px] ${getHeatColor(issue.heatScore).light} ${getHeatColor(issue.heatScore).text} px-2 py-0.5 rounded-full font-semibold">
+              🔥 ${issue.heatScore}
+            </span>
+          </div>
+          ${isVote ? `<div class="mt-3"><button onclick="event.stopPropagation();openVoteModal(${issue.id})"
+             class="text-[10px] bg-violet-600 text-white px-3 py-1 rounded-full font-semibold hover:bg-violet-700 transition-colors">🗳️ Cast Your Vote</button></div>` : ''}` : ''}
         </div>
       </div>`;
   }).join('');
@@ -113,67 +154,155 @@ function renderNotifList() {
 
 function filterNotifs(f, btn) {
   notifFilter = f;
-  document.querySelectorAll('.notif-filter-btn').forEach(b=>{b.className='notif-filter-btn flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 transition-all';});
-  btn.className='notif-filter-btn flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-violet-600 text-white transition-all';
+  document.querySelectorAll('.notif-filter-btn').forEach(b => {
+    b.className = 'notif-filter-btn flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 transition-all';
+  });
+  btn.className = 'notif-filter-btn flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-violet-600 text-white transition-all';
   renderNotifList();
 }
 
 function handleNotifClick(id, issueId, type) {
-  const n = userNotifs.find(n=>n.id===id);
-  if (n && !n.read) { n.read = true; saveNotifs(); renderNotifList(); }
-  if (type === 'review' && issueId) { openReview(issueId); return; }
+  const n = notificationsStore.find(n=>n.id===id);
+  if (n && !n.read) { markSingleRead(id); }
+  if (type === 'vote_request' && issueId) { openVoteModal(issueId); return; }
   if (issueId) window.location.href = `issue.html?id=${issueId}`;
 }
 
-function markAllRead() {
-  userNotifs.forEach(n => n.read = true);
-  saveNotifs();
-  renderNotifList();
-  Toast.show('All notifications marked as read', 'success', 1500);
+async function markAllRead() {
+  try{
+    await window.CivicAPI.markNotificationsReadAll();
+    notificationsStore=notificationsStore.map(n=>({...n,read:true}));
+    syncNotifications(notificationsStore);
+    renderNotifList();
+    renderNavbar('notifications.html');
+    renderBottomNav('notifications.html');
+    Toast.show('All notifications marked as read', 'success', 1500);
+  }catch(error){
+    Toast.show(error.message||'Could not update notifications','error');
+  }
 }
 
-function openReview(issueId) {
-  reviewIssueId = issueId;
+/* ── Vote Modal ── */
+function openVoteModal(issueId) {
+  voteIssueId = issueId;
   const issue = ISSUES.find(i=>i.id===issueId);
   if (!issue) return;
-  document.getElementById('review-issue-preview').innerHTML = `
+
+  // Issue preview
+  document.getElementById('vote-issue-preview').innerHTML = `
     <div class="flex items-center gap-3">
       <img src="${issue.image}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0" onerror="this.src='https://placehold.co/40'"/>
-      <div><p class="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">${issue.title}</p><p class="text-xs text-gray-500">${issue.location}</p></div>
-      <span class="ml-auto text-xs text-green-600 font-semibold bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full">Resolved ✅</span>
+      <div>
+        <p class="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">${issue.title}</p>
+        <p class="text-xs text-gray-500">${issue.location}</p>
+      </div>
+      <span class="ml-auto text-xs font-semibold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full">Awaiting Votes</span>
     </div>`;
-  setRating(0);
-  document.getElementById('review-text').value = '';
-  document.getElementById('review-modal').classList.remove('hidden');
-}
 
-function setRating(n) {
-  selectedRating = n;
-  document.querySelectorAll('[data-star]').forEach(btn => {
-    const star = parseInt(btn.dataset.star);
-    btn.className = `star-btn text-3xl transition-colors ${star <= n ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-400`;
-  });
-}
-
-function submitReview() {
-  if (selectedRating === 0) { Toast.show('Please select a rating', 'warning'); return; }
-  const issue = ISSUES.find(i=>i.id===reviewIssueId);
-  if (issue) {
-    issue.reviews.push({ user: currentUser?.name || 'Anonymous', rating: selectedRating, text: document.getElementById('review-text').value || 'Good resolution!', date: new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) });
-    // Mark review notif as read
-    const rn = userNotifs.find(n=>n.type==='review'&&n.issueId===reviewIssueId);
-    if (rn) rn.read = true;
-    saveNotifs();
+  // Proof photo
+  const proofWrap = document.getElementById('vote-proof-wrap');
+  if (issue.proofPhoto) {
+    document.getElementById('vote-proof-img').src = issue.proofPhoto;
+    proofWrap.classList.remove('hidden');
+  } else {
+    proofWrap.classList.add('hidden');
   }
-  document.getElementById('review-modal').classList.add('hidden');
-  Toast.show('Review submitted! ⭐ Thank you for your feedback', 'success', 3000);
+
+  // Tally
+  refreshVoteModal(issueId);
+
+  document.getElementById('vote-modal').classList.remove('hidden');
+}
+
+function refreshVoteModal(issueId) {
+  const issue = ISSUES.find(i=>i.id===issueId);
+  const tally = issue?.voteSummary || { satisfied:0, notSatisfied:0, total:0, satisfactionPercent:0 };
+  const total = tally.total;
+  const satPct = tally.satisfactionPercent;
+
+  // Always show tally bar
+  document.getElementById('vote-tally-wrap').classList.remove('hidden');
+  document.getElementById('vote-tally-sat-pct').textContent = `${satPct}% Satisfied`;
+  document.getElementById('vote-tally-nosat-pct').textContent = `${100-satPct}% Not Satisfied`;
+  document.getElementById('vote-tally-bar').style.width = satPct + '%';
+  document.getElementById('vote-tally-meta').textContent =
+    `${total} vote${total!==1?'s':''} · ≥60% needed for auto-resolve`;
+
+  document.getElementById('vote-btn-area').classList.toggle('hidden', Boolean(issue?.viewer?.hasVoted));
+  document.getElementById('vote-already-voted').classList.toggle('hidden', !issue?.viewer?.hasVoted);
+}
+
+async function castVote(satisfied) {
+  if (!voteIssueId) return;
+  try{
+  const result = await window.CivicAPI.voteOnIssue(voteIssueId, satisfied);
+  mergeIssue(result.issue);
+  refreshVoteModal(voteIssueId);
+  if (result.decision?.outcomeStatus === 'resolved') {
+    Toast.show('🎉 Issue auto-resolved! Community voted satisfied.', 'success', 4000);
+    setTimeout(() => document.getElementById('vote-modal').classList.add('hidden'), 2000);
+  } else if (result.decision?.outcomeStatus === 'unsolved') {
+    Toast.show('Issue marked unsolved. Not enough satisfaction votes.', 'warning', 4000);
+    setTimeout(() => document.getElementById('vote-modal').classList.add('hidden'), 2000);
+  } else {
+    Toast.show(satisfied ? '✅ Voted Satisfied!' : '❌ Voted Not Satisfied!', 'success', 2000);
+  }
+  }catch(error){
+    Toast.show(error.message||'Could not submit vote','error');
+  }
+}
+
+async function markSingleRead(id){
+  try{
+    await window.CivicAPI.markNotificationRead(id);
+    notificationsStore=notificationsStore.map(n=>n.id===id?{...n,read:true}:n);
+    syncNotifications(notificationsStore);
+    renderNotifList();
+    renderNavbar('notifications.html');
+    renderBottomNav('notifications.html');
+  }catch(_error){}
+}
+
+async function loadNotifications(){
+  if(!currentUser){
+    document.getElementById('notif-list').innerHTML='<div class="text-center py-16"><h3 class="font-semibold text-gray-700 dark:text-gray-300 mb-1">Sign in to view notifications</h3><a href="auth.html" class="btn-primary mt-4 inline-flex">Sign In</a></div>';
+    document.getElementById('mark-all-btn').classList.add('hidden');
+    document.getElementById('notif-sub').textContent='Authentication required';
+    return;
+  }
+  const [notifications, issues] = await Promise.all([
+    window.CivicAPI.fetchNotifications(),
+    window.CivicAPI.fetchIssues({ limit: 100, sort: 'recent' })
+  ]);
+  notificationsStore = notifications.map((n)=>({
+    ...n,
+    icon: {
+      progress:'🔧',
+      upvote:'👍',
+      escalated:'⚠️',
+      resolved:'✅',
+      nearby:'📍',
+      review:'⭐',
+      submitted:'📢',
+      vote_request:'🗳️'
+    }[n.type] || '🔔',
+    time: timeAgo(n.createdAt)
+  }));
+  syncNotifications(notificationsStore);
+  syncIssues(issues);
   renderNotifList();
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded', async () => {
   renderNavbar('notifications.html');
   renderBottomNav('notifications.html');
-  renderNotifList();
+  try{
+    await loadNotifications();
+  }catch(error){
+    document.getElementById('notif-list').innerHTML='<div class="text-center py-16 text-sm text-gray-400">Could not load notifications</div>';
+    document.getElementById('notif-sub').textContent='Load failed';
+    Toast.show(error.message||'Could not load notifications','error');
+  }
 });
 </script>
 </body>

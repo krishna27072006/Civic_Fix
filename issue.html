@@ -47,7 +47,11 @@
     <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Leave a Review ⭐</h2>
     <p class="text-sm text-gray-500 mb-4">How well was this issue resolved?</p>
     <div class="flex gap-2 justify-center mb-4" id="star-row">
-      ${[1,2,3,4,5].map(n=>`<button type="button" onclick="setReviewRating(${n})" class="text-3xl text-gray-300 hover:text-yellow-400 transition-all review-star" data-star="${n}">★</button>`).join('')}
+      <button type="button" onclick="setReviewRating(1)" class="text-3xl text-gray-300 hover:text-yellow-400 transition-all review-star" data-star="1">★</button>
+      <button type="button" onclick="setReviewRating(2)" class="text-3xl text-gray-300 hover:text-yellow-400 transition-all review-star" data-star="2">★</button>
+      <button type="button" onclick="setReviewRating(3)" class="text-3xl text-gray-300 hover:text-yellow-400 transition-all review-star" data-star="3">★</button>
+      <button type="button" onclick="setReviewRating(4)" class="text-3xl text-gray-300 hover:text-yellow-400 transition-all review-star" data-star="4">★</button>
+      <button type="button" onclick="setReviewRating(5)" class="text-3xl text-gray-300 hover:text-yellow-400 transition-all review-star" data-star="5">★</button>
     </div>
     <textarea id="review-text-field" rows="3" placeholder="Share your experience…" class="form-input resize-none mb-4"></textarea>
     <div class="flex gap-3">
@@ -57,6 +61,7 @@
   </div>
 </div>
 
+<script src="js/api.js"></script>
 <script src="js/data.js"></script>
 <script src="js/components.js"></script>
 <script>
@@ -69,58 +74,111 @@ function setReviewRating(n){
   });
 }
 
-function submitIssueReview(){
+async function submitIssueReview(){
   if(reviewRating===0){Toast.show('Please select a rating','warning');return;}
-  const issue=ISSUES.find(i=>i.id===currentIssueId);
-  if(issue){
-    issue.reviews.push({user:currentUser?.name||'Anonymous',rating:reviewRating,text:document.getElementById('review-text-field').value||'Good resolution!',date:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})});
-    localStorage.setItem('civicIssues',JSON.stringify(ISSUES));
+  try{
+    const updated=await window.CivicAPI.submitIssueReview(currentIssueId,{
+      rating:reviewRating,
+      reviewText:document.getElementById('review-text-field').value||'Good resolution!'
+    });
+    mergeIssue(updated);
+    document.getElementById('review-modal').classList.add('hidden');
+    Toast.show('Review submitted! ⭐ Thank you','success',2000);
+    reviewRating=0;
+    setTimeout(renderIssuePage,300);
+  }catch(error){
+    Toast.show(error.message||'Could not submit review','error');
   }
-  document.getElementById('review-modal').classList.add('hidden');
-  Toast.show('Review submitted! ⭐ Thank you','success',2000);
-  setTimeout(renderIssuePage,500);
 }
 
-function markNotFixed(){Toast.show('Marked as "Still Not Fixed" — Heat score will increase!','warning',3000);}
+async function markNotFixed(){
+  try{
+    const updated=await window.CivicAPI.markIssueNotFixed(currentIssueId);
+    mergeIssue(updated);
+    Toast.show('Marked as "Still Not Fixed"','warning',3000);
+    renderIssuePage();
+  }catch(error){
+    Toast.show(error.message||'Could not update issue','error');
+  }
+}
+
+async function castVoteFromIssue(issueId, satisfied) {
+  try{
+  const result = await window.CivicAPI.voteOnIssue(issueId, satisfied);
+  mergeIssue(result.issue);
+
+  const tally = result.issue.voteSummary;
+  const total = tally.total;
+  const satPct = tally.satisfactionPercent;
+  const tallyEl = document.getElementById('issue-vote-tally');
+  if (tallyEl) tallyEl.innerHTML = `
+    <div class="mb-3">
+      <div class="flex justify-between text-xs font-semibold mb-1">
+        <span class="text-green-600">✅ ${tally.satisfied} satisfied (${satPct}%)</span>
+        <span class="text-red-500">❌ ${tally.notSatisfied} not satisfied</span>
+      </div>
+      <div class="w-full h-3 bg-red-200 dark:bg-red-900/40 rounded-full overflow-hidden">
+        <div class="h-full bg-green-500 rounded-full transition-all duration-500" style="width:${satPct}%"></div>
+      </div>
+      <p class="text-[11px] text-gray-400 mt-1">${total} vote${total!==1?'s':''} cast · 60% threshold for auto-resolve</p>
+    </div>`;
+  const btnArea = document.getElementById('vote-buttons-widget');
+  if (btnArea) {
+    btnArea.outerHTML = `<div class="text-center py-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+      <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">You've already voted ✓</p>
+      <p class="text-xs text-gray-400 mt-0.5">Results update as more votes come in.</p>
+    </div>`;
+  }
+
+  if (result.decision?.outcomeStatus === 'resolved') {
+    Toast.show('🎉 Issue auto-resolved! Community voted satisfied.', 'success', 4000);
+    setTimeout(() => window.location.reload(), 2500);
+  } else if (result.decision?.outcomeStatus === 'unsolved') {
+    Toast.show('Issue marked unsolved. Not enough satisfaction votes.', 'warning', 4000);
+    setTimeout(() => window.location.reload(), 2500);
+  } else {
+    Toast.show(satisfied ? '✅ Voted Satisfied!' : '❌ Voted Not Satisfied!', 'success', 2000);
+  }
+  }catch(error){
+    Toast.show(error.message||'Could not submit vote','error');
+  }
+}
 function shareIssue(){
   if(navigator.share)navigator.share({title:'CivicFix Issue',url:window.location.href});
   else{navigator.clipboard?.writeText(window.location.href);Toast.show('Link copied!','success',1500);}
 }
 
-function handleUpvote(id,btn){
+async function handleUpvote(id,btn){
+  btn.classList.add('upvote-pop');setTimeout(()=>btn.classList.remove('upvote-pop'),350);
+  await toggleUpvote(id, btn);
   const issue=ISSUES.find(i=>i.id===id);if(!issue)return;
   const label=document.getElementById('upvote-label');
-  btn.classList.add('upvote-pop');setTimeout(()=>btn.classList.remove('upvote-pop'),350);
-  if(upvotedIssues.has(id)){
-    upvotedIssues.delete(id);issue.upvotes--;
-    btn.className='upvote-btn w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-violet-200 dark:border-violet-800 text-violet-600 dark:text-violet-400 hover:bg-violet-50 font-semibold text-sm transition-all';
-    btn.querySelector('svg').setAttribute('fill','none');
-    if(label)label.textContent=`Upvote · ${issue.upvotes}`;
-    Toast.show('Upvote removed','info',1500);
-  }else{
-    upvotedIssues.add(id);issue.upvotes++;
-    btn.className='upvote-btn voted w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 font-semibold text-sm transition-all';
-    btn.querySelector('svg').setAttribute('fill','currentColor');
-    if(label)label.textContent=`Upvoted · ${issue.upvotes}`;
-    Toast.show('Issue upvoted! 👍','success',1500);
-  }
-  saveUpvoted();
+  if(label)label.textContent=`${upvotedIssues.has(id)?'Upvoted':'Upvote'} · ${issue.upvotes}`;
   const mob=document.getElementById('mob-upvote');
   if(mob)mob.textContent=upvotedIssues.has(id)?'✅ Upvoted':'👍 Upvote';
 }
 
-function renderIssuePage(){
+async function renderIssuePage(){
   const params=new URLSearchParams(window.location.search);
   const id=parseInt(params.get('id'));
-  const issue=ISSUES.find(i=>i.id===id);
+  if(!Number.isFinite(id)){document.getElementById('loading-state').classList.add('hidden');document.getElementById('not-found').classList.remove('hidden');return;}
   currentIssueId=id;
+  let issue=ISSUES.find(i=>i.id===id);
+  try{
+    issue=await window.CivicAPI.fetchIssue(id);
+    mergeIssue(issue);
+  }catch(error){
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('not-found').classList.remove('hidden');
+    Toast.show(error.message||'Could not load issue','error');
+    return;
+  }
   document.getElementById('loading-state').classList.add('hidden');
-  if(!issue){document.getElementById('not-found').classList.remove('hidden');return;}
   document.title=`CivicFix — ${issue.title}`;
   const heat=getHeatColor(issue.heatScore);
   const status=STATUSES[issue.status];
   const cat=getCategoryInfo(issue.category);
-  const upvoted=upvotedIssues.has(id);
+  const upvoted=issue.viewer?.hasUpvoted || upvotedIssues.has(id);
   const avgRating=issue.reviews.length>0?Math.round(issue.reviews.reduce((s,r)=>s+r.rating,0)/issue.reviews.length):0;
 
   document.getElementById('issue-content').classList.remove('hidden');
@@ -161,6 +219,60 @@ function renderIssuePage(){
           <div class="stat-card text-center"><div class="text-2xl font-extrabold ${heat.text}">${issue.heatScore}</div><div class="text-xs text-gray-500 mt-0.5">Heat Score</div></div>
           <div class="stat-card text-center"><div class="text-2xl font-extrabold text-orange-500">${issue.daysOpen}</div><div class="text-xs text-gray-500 mt-0.5">Days Pending</div></div>
         </div>
+
+        ${issue.status==='awaiting_review' ? `
+        <!-- Vote Widget -->
+        <div class="glass-card rounded-2xl p-5 fade-in-up border-2 border-violet-300 dark:border-violet-700" id="vote-widget">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-xl">🗳️</span>
+            <h2 class="font-bold text-gray-900 dark:text-white">Community Vote</h2>
+            <span class="ml-auto text-[10px] bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full font-semibold">Awaiting Votes</span>
+          </div>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Admin has uploaded proof of resolution. Your vote decides if this issue is closed.</p>
+          ${issue.proofPhoto ? `
+          <div class="mb-4">
+            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">📸 Admin Proof Photo</p>
+            <img src="${issue.proofPhoto}" class="w-full rounded-xl object-cover max-h-56" alt="Resolution proof"/>
+          </div>` : ''}
+          <div id="issue-vote-tally">
+            ${(()=>{
+              const tally=issue.voteSummary || { satisfied: 0, notSatisfied: 0, total: 0, satisfactionPercent: 0 };
+              const total=tally.total ?? (tally.satisfied + tally.notSatisfied);
+              const satPct=tally.satisfactionPercent ?? (total>0?Math.round((tally.satisfied/total)*100):0);
+              return `
+              <div class="mb-3">
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-green-600">✅ ${tally.satisfied} satisfied (${satPct}%)</span>
+                  <span class="text-red-500">❌ ${tally.notSatisfied} not satisfied</span>
+                </div>
+                <div class="w-full h-3 bg-red-200 dark:bg-red-900/40 rounded-full overflow-hidden">
+                  <div class="h-full bg-green-500 rounded-full transition-all duration-500" style="width:${satPct}%"></div>
+                </div>
+                <p class="text-[11px] text-gray-400 mt-1">${total} vote${total!==1?'s':''} cast · 60% threshold for auto-resolve</p>
+              </div>`;
+            })()}
+          </div>
+          ${issue.viewer?.hasVoted ? `
+          <div class="text-center py-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+            <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">You've already voted ✓</p>
+            <p class="text-xs text-gray-400 mt-0.5">Results update as more votes come in.</p>
+          </div>` : `
+          <div class="grid grid-cols-2 gap-3" id="vote-buttons-widget">
+            <button onclick="castVoteFromIssue(${issue.id},true)"
+              class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:border-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 transition-all">
+              <span class="text-3xl">✅</span>
+              <span class="text-sm font-bold text-green-700 dark:text-green-400">Satisfied</span>
+              <span class="text-[11px] text-gray-500 text-center">Issue is fixed</span>
+            </button>
+            <button onclick="castVoteFromIssue(${issue.id},false)"
+              class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 hover:border-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all">
+              <span class="text-3xl">❌</span>
+              <span class="text-sm font-bold text-red-600 dark:text-red-400">Not Satisfied</span>
+              <span class="text-[11px] text-gray-500 text-center">Still not resolved</span>
+            </button>
+          </div>
+          <p class="text-[11px] text-gray-400 text-center mt-2">≥60% satisfied → auto-resolved · &lt;60% → marked unsolved</p>`}
+        </div>` : ''}
 
         <!-- Description -->
         <div class="glass-card rounded-2xl p-5 fade-in-up-delay-1">
@@ -357,7 +469,7 @@ function renderIssuePage(){
 document.addEventListener('DOMContentLoaded',()=>{
   renderNavbar('');
   renderBottomNav('');
-  setTimeout(renderIssuePage,700);
+  renderIssuePage();
 });
 </script>
 </body>

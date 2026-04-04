@@ -34,7 +34,7 @@
           <p class="text-sm text-amber-700 dark:text-amber-400 mb-3">Instead of creating a duplicate, consider upvoting the existing issue to increase its priority.</p>
           <div id="duplicate-list" class="space-y-2 mb-3"></div>
           <div class="flex gap-2">
-            <button onclick="hideDuplicate()" class="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline">Report anyway →</button>
+            <button type="button" onclick="hideDuplicate()" class="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline">Report anyway →</button>
           </div>
         </div>
       </div>
@@ -158,7 +158,7 @@
             <div class="peer-checked:border-green-500 peer-checked:bg-green-50 dark:peer-checked:bg-green-950/20 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3 text-center transition-all hover:border-gray-300"><div class="text-lg mb-1">🟢</div><div class="text-xs font-semibold text-gray-700 dark:text-gray-300">Low</div></div>
           </label>
           <label class="flex-1 cursor-pointer"><input type="radio" name="urgency" value="medium" class="sr-only peer" checked/>
-            <div class="peer-checked:border-yellow-500 peer-checked:bg-yellow-50 dark:peer-checked:bg-yellow-950/20 border-2 border-yellow-400 rounded-xl p-3 text-center transition-all"><div class="text-lg mb-1">🟡</div><div class="text-xs font-semibold text-gray-700 dark:text-gray-300">Medium</div></div>
+            <div class="peer-checked:border-yellow-500 peer-checked:bg-yellow-50 dark:peer-checked:bg-yellow-950/20 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3 text-center transition-all hover:border-gray-300"><div class="text-lg mb-1">🟡</div><div class="text-xs font-semibold text-gray-700 dark:text-gray-300">Medium</div></div>
           </label>
           <label class="flex-1 cursor-pointer"><input type="radio" name="urgency" value="high" class="sr-only peer"/>
             <div class="peer-checked:border-red-500 peer-checked:bg-red-50 dark:peer-checked:bg-red-950/20 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3 text-center transition-all hover:border-gray-300"><div class="text-lg mb-1">🔴</div><div class="text-xs font-semibold text-gray-700 dark:text-gray-300">High</div></div>
@@ -198,10 +198,11 @@
 
 <div id="bottom-nav" class="bottom-nav md:hidden"></div>
 
+<script src="js/api.js"></script>
 <script src="js/data.js"></script>
 <script src="js/components.js"></script>
 <script>
-let currentStep=1, anonMode=false, selectedFile=null, dupDismissed=false;
+let currentStep=1, anonMode=false, selectedFile=null, dupDismissed=false, duplicateOverride=false;
 
 function initCategories(){
   const grid=document.getElementById('category-grid');
@@ -217,6 +218,8 @@ function selectCategory(id,btn){
   document.querySelectorAll('.category-card').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   document.getElementById('selected-category').value=id;
+  duplicateOverride=false;
+  dupDismissed=false;
   checkDuplicates();
 }
 
@@ -237,7 +240,7 @@ function checkDuplicates(){
         <p class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1">${i.title}</p>
         <p class="text-[10px] text-gray-500">${i.location} · <span class="${heat.text} font-bold">🔥${i.heatScore}</span></p>
       </div>
-      <button onclick="quickUpvote(${i.id},this)" class="text-xs font-bold px-2 py-1 rounded-lg ${upvoted?'bg-violet-600 text-white':'bg-indigo-100 text-violet-600 hover:bg-violet-200'} transition-colors whitespace-nowrap">
+      <button type="button" onclick="quickUpvote(${i.id},this)" class="text-xs font-bold px-2 py-1 rounded-lg ${upvoted?'bg-violet-600 text-white':'bg-indigo-100 text-violet-600 hover:bg-violet-200'} transition-colors whitespace-nowrap">
         ${upvoted?'✓ Upvoted':'👍 Upvote'}
       </button>
     </div>`;
@@ -246,11 +249,16 @@ function checkDuplicates(){
 }
 
 function quickUpvote(id,btn){
-  const issue=ISSUES.find(i=>i.id===id);if(!issue)return;
-  if(!upvotedIssues.has(id)){upvotedIssues.add(id);issue.upvotes++;saveUpvoted();btn.className='text-xs font-bold px-2 py-1 rounded-lg bg-violet-600 text-white whitespace-nowrap';btn.textContent='✓ Upvoted';Toast.show('Upvoted! Issue priority increased 👍','success');}
+  if(!currentUser){Toast.show('Sign in to upvote duplicate issues','info');return;}
+  toggleUpvote(id, btn);
+  duplicateOverride=false;
 }
 
-function hideDuplicate(){dupDismissed=true;document.getElementById('duplicate-alert').classList.add('hidden');}
+function hideDuplicate(){
+  dupDismissed=true;
+  duplicateOverride=true;
+  document.getElementById('duplicate-alert').classList.add('hidden');
+}
 
 function updateCharCount(el,id,max){
   const c=el.value.length; const e=document.getElementById(id);
@@ -312,6 +320,8 @@ function onLocationChange(val){
   const placeholder=document.getElementById('loc-placeholder');
   const pin=document.getElementById('loc-pin');
   const lbl=document.getElementById('map-loc-label');
+  duplicateOverride=false;
+  dupDismissed=false;
   if(val.length>3){placeholder.classList.add('hidden');pin.classList.remove('hidden');lbl.textContent=val.substring(0,40);}
   else{placeholder.classList.remove('hidden');pin.classList.add('hidden');}
   checkDuplicates();
@@ -320,18 +330,19 @@ function onLocationChange(val){
 function detectLocation(){
   const btn=document.getElementById('gps-btn');
   const lbl=document.getElementById('gps-label');
-  lbl.textContent='…';btn.disabled=true;
+  lbl.textContent='...';btn.disabled=true;
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
-      const LOCS=['Koramangala 5th Block, Bengaluru','Indiranagar 12th Main, Bengaluru','HSR Layout Sector 2, Bengaluru','MG Road Junction, Bengaluru','Whitefield Main Rd, Bengaluru'];
-      const loc=LOCS[Math.floor(Math.random()*LOCS.length)];
+      const lat=Number(pos.coords.latitude.toFixed(5));
+      const lng=Number(pos.coords.longitude.toFixed(5));
+      const loc=`Lat ${lat}, Lng ${lng}`;
+      saveLocation({lat,lng,area:null,city:'Bengaluru',full:loc});
       document.getElementById('location-input').value=loc;
-      lbl.textContent='✓';btn.disabled=false;
-      onLocationChange(loc);Toast.show('Location detected! 📍','success',2000);
+      lbl.textContent='OK';btn.disabled=false;
+      onLocationChange(loc);Toast.show('Location detected','success',2000);
     },()=>{
-      document.getElementById('location-input').value='Bengaluru, Karnataka';
       lbl.textContent='GPS';btn.disabled=false;
-      onLocationChange('Bengaluru, Karnataka');Toast.show('Using approximate location','info',2000);
+      Toast.show('Location access denied','warning',2000);
     });
   }else{lbl.textContent='GPS';btn.disabled=false;}
 }
@@ -355,30 +366,74 @@ function processFile(file){
 function removeImage(e){e.stopPropagation();selectedFile=null;document.getElementById('upload-placeholder').classList.remove('hidden');document.getElementById('upload-preview').classList.add('hidden');document.getElementById('file-input').value='';}
 function toggleAnon(btn){anonMode=!anonMode;btn.classList.toggle('bg-violet-500',anonMode);btn.classList.toggle('bg-gray-200',!anonMode);document.getElementById('anon-knob').style.transform=anonMode?'translateX(24px)':'translateX(0)';}
 
-function submitReport(e){
+async function submitReport(e){
   e.preventDefault();
+  if(!currentUser){Toast.show('Sign in before reporting an issue','warning');setTimeout(()=>window.location.href='auth.html',700);return;}
+  if(userLocation?.lat == null || userLocation?.lng == null){
+    Toast.show('Enable GPS location before submitting','warning');
+    return;
+  }
   const btn=document.getElementById('submit-btn');
   btn.disabled=true;
   btn.innerHTML=`<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Submitting…`;
-  setTimeout(()=>{
-    const imgEl=document.getElementById('preview-img');
-    const newIssue=addNewIssue({
+  try{
+    const localDuplicates=findSimilarIssues(
+      document.getElementById('location-input').value,
+      document.getElementById('selected-category').value
+    );
+    if(localDuplicates.length && !duplicateOverride){
+      document.getElementById('duplicate-alert').classList.remove('hidden');
+      Toast.show('Similar issue found nearby. Upvote it or choose "Report anyway".','warning',3000);
+      return;
+    }
+    const newIssue=await window.CivicAPI.createIssue({
       title:document.getElementById('issue-title').value,
       description:document.getElementById('issue-desc').value,
       category:document.getElementById('selected-category').value,
       location:document.getElementById('location-input').value,
-      imageUrl:imgEl.src||'',
+      imageUrl:selectedFile ? document.getElementById('preview-img').src : null,
+      area:userLocation?.area||null,
+      city:userLocation?.city||'Bengaluru',
+      lat:userLocation.lat,
+      lng:userLocation.lng,
+      urgency:document.querySelector('input[name="urgency"]:checked').value,
+      anonymous:anonMode
     });
+    mergeIssue(newIssue);
+    userReportedIds.unshift(newIssue.id);
+    saveReported();
     document.getElementById('report-form').classList.add('hidden');
     document.getElementById('success-state').classList.remove('hidden');
-    document.getElementById('issue-id-msg').textContent=`Issue #${newIssue.id} · Now visible in All Issues & Nearby feed`;
+    document.getElementById('issue-id-msg').textContent=`Issue #${newIssue.id} · Now visible in the live backend feed`;
     Toast.show('Issue reported! 🎉','success',4000);
-  },2000);
+  }catch(error){
+    if(error.status===409 && Array.isArray(error.data?.duplicates) && error.data.duplicates.length){
+      syncIssues([...ISSUES,...error.data.duplicates].filter((issue,index,items)=>items.findIndex((candidate)=>candidate.id===issue.id)===index));
+      dupDismissed=false;
+      duplicateOverride=false;
+      checkDuplicates();
+      Toast.show(error.message||'Similar issue already exists nearby','warning',3500);
+      return;
+    }
+    Toast.show(error.message||'Could not submit report','error',3000);
+  }finally{
+    btn.disabled=false;
+    btn.innerHTML='<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Submit Report';
+  }
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded',async ()=>{
   renderNavbar('report.html');
   renderBottomNav('report.html');
+  try{
+    const [categories, issues] = await Promise.all([
+      window.CivicAPI.fetchCategories(),
+      window.CivicAPI.fetchIssues({ limit: 100, sort: 'heat' })
+    ]);
+    CATEGORIES.length=0;
+    CATEGORIES.push(...categories);
+    syncIssues(issues);
+  }catch(_error){}
   initCategories();
   // Pre-fill location from saved
   if(userLocation){

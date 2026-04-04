@@ -7,7 +7,7 @@
   <script>tailwind.config={darkMode:'class'}</script>
   <link rel="stylesheet" href="css/style.css"/>
   <style>
-    .auth-bg{background:linear-gradient(135deg,#9899ed 0%,#8b5cf6 40%,#7c3aed 100%);}
+    .auth-bg{background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 40%,#7c3aed 100%);}
     input:invalid:not(:placeholder-shown){border-color:#f87171;}
     input:valid:not(:placeholder-shown){border-color:#4ade80;}
   </style>
@@ -102,7 +102,7 @@
             </div>
           </div>
           <div class="bg-violet-50 dark:bg-indigo-900/20 rounded-xl p-3 text-xs text-indigo-700 dark:text-violet-400 border border-violet-100 dark:border-violet-800">
-            <strong>Demo:</strong> user@civicfix.com / pass123 &nbsp;|&nbsp; admin@civicfix.com / admin123
+            <strong>Demo:</strong> user@civicfix.com / pass12345 &nbsp;|&nbsp; admin@civicfix.com / admin123
           </div>
           <button type="submit" id="login-btn" class="btn-primary w-full justify-center py-3 text-base">Sign In</button>
         </form>
@@ -135,22 +135,12 @@
             <div class="relative"><input type="password" id="reg-password" placeholder="Min 8 characters" class="form-input pr-10" required minlength="8" oninput="checkStrength(this.value)"/>
               <button type="button" onclick="togglePwd('reg-password')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></button>
             </div>
-            <div class="mt-1.5"><div class="flex gap-1 mb-1">${[1,2,3,4].map(i=>`<div class="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden"><div class="h-full password-strength-bar" id="str-${i}" style="width:0%"></div></div>`).join('')}</div>
+            <div class="mt-1.5"><div class="flex gap-1 mb-1"><div class="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden"><div class="h-full password-strength-bar" id="str-1" style="width:0%"></div></div><div class="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden"><div class="h-full password-strength-bar" id="str-2" style="width:0%"></div></div><div class="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden"><div class="h-full password-strength-bar" id="str-3" style="width:0%"></div></div><div class="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden"><div class="h-full password-strength-bar" id="str-4" style="width:0%"></div></div></div>
             <p class="text-xs text-gray-400" id="strength-label">Enter password</p></div>
           </div>
           <!-- Role -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Account Type</label>
-            <div class="grid grid-cols-2 gap-2">
-              <label class="role-card selected flex items-center gap-2 p-3 border-2 border-violet-500 rounded-xl bg-violet-50 dark:bg-indigo-900/20 cursor-pointer" id="role-citizen">
-                <input type="radio" name="role" value="citizen" checked class="sr-only"/>
-                <span class="text-xl">👤</span><div><p class="text-xs font-semibold text-gray-900 dark:text-white">Citizen</p><p class="text-[10px] text-gray-500">Report issues</p></div>
-              </label>
-              <label class="role-card flex items-center gap-2 p-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer" id="role-admin" onclick="document.getElementById('role-citizen').classList.remove('selected');this.classList.add('selected')">
-                <input type="radio" name="role" value="admin" class="sr-only"/>
-                <span class="text-xl">👨‍💼</span><div><p class="text-xs font-semibold text-gray-900 dark:text-white">Admin</p><p class="text-[10px] text-gray-500">Manage issues</p></div>
-              </label>
-            </div>
+          <div class="bg-violet-50 dark:bg-indigo-900/20 rounded-xl p-3 text-xs text-violet-700 dark:text-violet-300 border border-violet-100 dark:border-violet-800">
+            New accounts are created as <strong>citizen</strong> accounts. Administrator access uses the seeded backend admin account.
           </div>
           <!-- Location permission -->
           <div class="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-3 flex items-center justify-between">
@@ -171,6 +161,7 @@
   </div>
 </div>
 
+<script src="js/api.js"></script>
 <script src="js/data.js"></script>
 <script src="js/components.js"></script>
 <script>
@@ -191,50 +182,75 @@ function switchMode(m){
 function requestLocation(){
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
-      const AREAS=['Koramangala','Indiranagar','HSR Layout','Whitefield','Electronic City','JP Nagar'];
-      const area=AREAS[Math.floor(Math.random()*AREAS.length)];
-      detectedLocation={lat:pos.coords.latitude,lng:pos.coords.longitude,area,city:'Bengaluru',full:`${area}, Bengaluru`};
+      const lat=Number(pos.coords.latitude.toFixed(5));
+      const lng=Number(pos.coords.longitude.toFixed(5));
+      detectedLocation={lat,lng,area:null,city:'Bengaluru',full:`Lat ${lat}, Lng ${lng}`};
       saveLocation(detectedLocation);
       document.getElementById('location-banner').classList.add('hidden');
       const s=document.getElementById('location-status');
       s.classList.remove('hidden');
-      document.getElementById('location-status-text').textContent=`📍 ${area}, Bengaluru — Location saved`;
-      document.getElementById('loc-perm-btn')&&(document.getElementById('loc-perm-btn').textContent='✓ Enabled');
-      Toast.show(`Location set to ${area}! 📍`,'success');
+      document.getElementById('location-status-text').textContent=`Detected location saved (${lat}, ${lng})`;
+      document.getElementById('loc-perm-btn')&&(document.getElementById('loc-perm-btn').textContent='Enabled');
+      Toast.show('Location saved','success');
     },()=>{
       Toast.show('Location access denied. You can enable it later.','info');
     });
   }
 }
 
-function handleLogin(e){
+async function handleLogin(e){
   e.preventDefault();
   const email=document.getElementById('login-email').value;
   const pass=document.getElementById('login-password').value;
   const btn=document.getElementById('login-btn');
   btn.disabled=true;
   btn.innerHTML=`<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Signing in…`;
-  setTimeout(()=>{
-    const isAdmin=email.includes('admin')||pass.includes('admin');
-    currentUser={name:email.split('@')[0],email,isAdmin,uid:'u_'+Date.now(),avatar:email.charAt(0).toUpperCase(),joinedAt:new Date().toISOString().split('T')[0]};
-    localStorage.setItem('civicUser',JSON.stringify(currentUser));
+  try{
+    const result=await window.CivicAPI.login({email,password:pass});
+    currentUser=syncCurrentUser(result.user);
     if(!userLocation) requestLocation();
     Toast.show(`Welcome back, ${currentUser.name}! 👋`,'success',2000);
-    setTimeout(()=>window.location.href=isAdmin?'admin.html':'index.html',1000);
-  },1500);
+    setTimeout(()=>window.location.href=currentUser.isAdmin?'admin.html':'index.html',800);
+  }catch(error){
+    Toast.show(error.message||'Sign in failed','error',2500);
+  }finally{
+    btn.disabled=false;
+    btn.innerHTML='Sign In';
+  }
 }
 
-function handleRegister(e){
+async function handleRegister(e){
   e.preventDefault();
   const fname=document.getElementById('reg-fname').value;
   const lname=document.getElementById('reg-lname').value;
   const email=document.getElementById('reg-email').value;
-  const role=document.querySelector('input[name="role"]:checked').value;
-  currentUser={name:`${fname} ${lname}`,email,isAdmin:role==='admin',uid:'u_'+Date.now(),avatar:fname.charAt(0).toUpperCase(),joinedAt:new Date().toISOString().split('T')[0]};
-  if(detectedLocation) saveLocation(detectedLocation);
-  localStorage.setItem('civicUser',JSON.stringify(currentUser));
-  Toast.show('Account created! Welcome to CivicFix 🎉','success',2000);
-  setTimeout(()=>window.location.href='index.html',1500);
+  const phone=document.getElementById('reg-phone').value;
+  const password=document.getElementById('reg-password').value;
+  const submitBtn=e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled=true;
+  submitBtn.innerHTML='Creating Account…';
+  try{
+    const result=await window.CivicAPI.register({
+      firstName:fname,
+      lastName:lname,
+      email,
+      phone:phone||null,
+      password,
+      area:detectedLocation?.area||userLocation?.area||null,
+      city:detectedLocation?.city||userLocation?.city||'Bengaluru',
+      lat:detectedLocation?.lat??userLocation?.lat??null,
+      lng:detectedLocation?.lng??userLocation?.lng??null
+    });
+    currentUser=syncCurrentUser(result.user);
+    if(detectedLocation) saveLocation(detectedLocation);
+    Toast.show('Account created! Welcome to CivicFix 🎉','success',2000);
+    setTimeout(()=>window.location.href=currentUser.isAdmin?'admin.html':'index.html',1000);
+  }catch(error){
+    Toast.show(error.message||'Registration failed','error',2500);
+  }finally{
+    submitBtn.disabled=false;
+    submitBtn.innerHTML='Create Account';
+  }
 }
 
 function checkStrength(val){
@@ -250,8 +266,13 @@ function oAuth(p){Toast.show(`${p} login coming soon!`,'info');}
 
 document.addEventListener('DOMContentLoaded',()=>{
   renderNavbar('auth.html');
+  if(currentUser){
+    window.location.href=currentUser.isAdmin?'admin.html':'index.html';
+    return;
+  }
   if(!userLocation) setTimeout(()=>document.getElementById('location-banner').classList.remove('hidden'),1500);
 });
 </script>
 </body>
 </html>
+
