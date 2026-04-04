@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CivicFix — Map View</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <link rel="stylesheet" href="css/style.css"/>
+  <style>
+    #map { width: 100%; height: calc(100vh - 64px); }
+    .marker-dot {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: transform 0.2s;
+      position: relative;
+    }
+    .marker-dot:hover { transform: scale(1.4); }
+    .marker-wrapper { position: relative; }
+    .marker-pulse {
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      animation: marker-pulse 2s infinite;
+      opacity: 0.3;
+    }
+    @keyframes marker-pulse {
+      0%, 100% { transform: scale(1); opacity: 0.3; }
+      50% { transform: scale(1.6); opacity: 0; }
+    }
+    .popup-card { min-width: 240px; max-width: 280px; }
+    .issue-list-item { transition: all 0.15s ease; }
+    .issue-list-item:hover { background: #f8fafc; }
+    .dark .issue-list-item:hover { background: #273344; }
+    .issue-list-item.active { background: #eef2ff; border-left: 3px solid #6366f1; }
+    .dark .issue-list-item.active { background: #1e1b4b; }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+  <div id="navbar"></div>
+
+  <div class="flex h-screen pt-16">
+    <!-- Sidebar -->
+    <div class="w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col z-10 shadow-sm hidden md:flex">
+      <!-- Sidebar Header -->
+      <div class="p-4 border-b border-gray-100 dark:border-gray-800">
+        <h2 class="font-bold text-gray-900 dark:text-white mb-3">Issue Map</h2>
+        <div class="relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" placeholder="Search on map..." class="form-input pl-9 text-sm" oninput="filterMapList(this.value)" id="map-search"/>
+        </div>
+      </div>
+
+      <!-- Heat Legend -->
+      <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">SEVERITY</p>
+        <div class="flex gap-3">
+          <div class="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300"><span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>High (≥80)</div>
+          <div class="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300"><span class="w-3 h-3 rounded-full bg-orange-500 inline-block"></span>Med (≥60)</div>
+          <div class="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300"><span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>Low</div>
+        </div>
+      </div>
+
+      <!-- Toggle -->
+      <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <span class="text-xs font-semibold text-gray-600 dark:text-gray-400">Heatmap View</span>
+        <button onclick="toggleHeatmap(this)" id="heatmap-toggle" class="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative transition-colors duration-200 cursor-pointer">
+          <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 transform" id="heatmap-knob"></span>
+        </button>
+      </div>
+
+      <!-- Issue List -->
+      <div class="flex-1 overflow-y-auto" id="map-issue-list">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <!-- Map Container -->
+    <div class="flex-1 relative">
+      <!-- Mobile search overlay -->
+      <div class="absolute top-4 left-4 right-4 z-20 md:hidden">
+        <div class="relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" placeholder="Search issues..." class="form-input pl-9 shadow-lg" oninput="filterMapList(this.value)"/>
+        </div>
+      </div>
+
+      <!-- Map -->
+      <div id="map" class="bg-gray-200 dark:bg-gray-800 relative overflow-hidden">
+        <!-- Fallback map using CSS + positioned markers -->
+        <div id="svg-map" class="w-full h-full relative">
+          <!-- City grid background -->
+          <div class="absolute inset-0" style="background: linear-gradient(135deg, #e8f4fd 0%, #d4e9f7 50%, #c1ddf1 100%);">
+            <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" class="absolute inset-0 opacity-30">
+              <defs>
+                <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+                  <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#94a3b8" stroke-width="0.5"/>
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid)"/>
+              <!-- Roads -->
+              <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#cbd5e1" stroke-width="3"/>
+              <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#cbd5e1" stroke-width="3"/>
+              <line x1="0" y1="30%" x2="100%" y2="70%" stroke="#cbd5e1" stroke-width="2"/>
+              <line x1="0" y1="70%" x2="100%" y2="30%" stroke="#cbd5e1" stroke-width="2"/>
+              <line x1="20%" y1="0" x2="20%" y2="100%" stroke="#e2e8f0" stroke-width="1.5"/>
+              <line x1="80%" y1="0" x2="80%" y2="100%" stroke="#e2e8f0" stroke-width="1.5"/>
+              <line x1="0" y1="20%" x2="100%" y2="20%" stroke="#e2e8f0" stroke-width="1.5"/>
+              <line x1="0" y1="80%" x2="100%" y2="80%" stroke="#e2e8f0" stroke-width="1.5"/>
+              <!-- Water bodies -->
+              <ellipse cx="70%" cy="25%" rx="8%" ry="5%" fill="#bfdbfe" opacity="0.6"/>
+              <rect x="10%" y="60%" width="15%" height="8%" rx="4" fill="#bfdbfe" opacity="0.5"/>
+              <!-- City blocks -->
+              <rect x="22%" y="22%" width="25%" height="25%" rx="2" fill="#f1f5f9" opacity="0.7"/>
+              <rect x="55%" y="22%" width="22%" height="20%" rx="2" fill="#f1f5f9" opacity="0.7"/>
+              <rect x="22%" y="55%" width="20%" height="20%" rx="2" fill="#f1f5f9" opacity="0.7"/>
+              <rect x="55%" y="55%" width="25%" height="22%" rx="2" fill="#f1f5f9" opacity="0.7"/>
+            </svg>
+            <!-- Area Labels -->
+            <div class="absolute text-xs font-semibold text-gray-500 select-none" style="top:28%;left:25%">Koramangala</div>
+            <div class="absolute text-xs font-semibold text-gray-500 select-none" style="top:18%;left:55%">Indiranagar</div>
+            <div class="absolute text-xs font-semibold text-gray-500 select-none" style="top:60%;left:58%">HSR Layout</div>
+            <div class="absolute text-xs font-semibold text-gray-500 select-none" style="top:60%;left:22%">JP Nagar</div>
+            <div class="absolute text-xs font-semibold text-gray-500 select-none" style="top:40%;left:44%">CBD</div>
+            <div class="absolute text-xs font-semibold text-gray-500 select-none" style="top:10%;right:10%">Whitefield</div>
+            <div class="absolute text-xs font-semibold text-gray-500 select-none" style="bottom:15%;left:45%">Electronic City</div>
+          </div>
+          <!-- Markers rendered by JS -->
+          <div id="map-markers"></div>
+        </div>
+      </div>
+
+      <!-- Popup -->
+      <div id="map-popup" class="hidden absolute z-30 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden" style="min-width:260px;max-width:300px">
+        <div id="popup-content"></div>
+        <button onclick="document.getElementById('map-popup').classList.add('hidden')" 
+                class="absolute top-2 right-2 w-6 h-6 bg-black/20 rounded-full flex items-center justify-center text-white hover:bg-black/40 transition-colors">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Report button -->
+      <a href="report.html" class="absolute bottom-6 right-6 btn-primary shadow-xl z-20">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+        Report Issue Here
+      </a>
+
+      <!-- Dark map toggle for map -->
+      <div class="absolute bottom-6 left-6 z-20 flex gap-2">
+        <button onclick="toggleMapStyle()" class="bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-semibold px-3 py-2 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+          Dark Map
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/components.js"></script>
+  <script>
+    let heatmapOn = false;
+    let darkMapOn = false;
+    let mapSearch = '';
+
+    // Positions in % for the fake map
+    const MARKER_POSITIONS = [
+      { id: 1, x: 40, y: 45 },
+      { id: 2, x: 32, y: 32 },
+      { id: 3, x: 62, y: 22 },
+      { id: 4, x: 82, y: 18 },
+      { id: 5, x: 60, y: 62 },
+      { id: 6, x: 22, y: 62 },
+      { id: 7, x: 48, y: 78 },
+      { id: 8, x: 55, y: 38 },
+    ];
+
+    function getMarkerColor(score) {
+      if (score >= 80) return '#ef4444';
+      if (score >= 60) return '#f97316';
+      if (score >= 40) return '#eab308';
+      return '#22c55e';
+    }
+
+    function renderMarkers() {
+      const container = document.getElementById('map-markers');
+      const query = mapSearch.toLowerCase();
+      container.innerHTML = ISSUES
+        .filter(i => !query || i.title.toLowerCase().includes(query) || i.location.toLowerCase().includes(query))
+        .map(issue => {
+          const pos = MARKER_POSITIONS.find(p => p.id === issue.id) || { x: 50, y: 50 };
+          const color = getMarkerColor(issue.heatScore);
+          const size = heatmapOn ? Math.max(16, issue.heatScore / 4) : 16;
+          const opacity = heatmapOn ? Math.min(0.9, issue.heatScore / 100 + 0.2) : 1;
+          return `
+            <div class="marker-wrapper absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group"
+                 style="left:${pos.x}%;top:${pos.y}%;z-index:${issue.heatScore}"
+                 onclick="showPopup(${issue.id}, ${pos.x}, ${pos.y})">
+              ${issue.heatScore >= 80 ? `<span class="marker-pulse absolute inset-0 rounded-full" style="background:${color}"></span>` : ''}
+              <div class="marker-dot relative transition-all duration-200 group-hover:scale-150"
+                   style="width:${size}px;height:${size}px;background:${color};border:2px solid white;opacity:${opacity};border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3)">
+              </div>
+              <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-gray-900 text-white text-[10px] px-2 py-0.5 rounded-md whitespace-nowrap z-50 pointer-events-none shadow-lg">
+                ${issue.title.substring(0, 30)}...
+              </div>
+            </div>`;
+        }).join('');
+    }
+
+    function showPopup(id, px, py) {
+      const issue = ISSUES.find(i => i.id === id);
+      if (!issue) return;
+      const heat = getHeatColor(issue.heatScore);
+      const status = STATUSES[issue.status];
+
+      const popup = document.getElementById('map-popup');
+      document.getElementById('popup-content').innerHTML = `
+        <div class="relative">
+          <img src="${issue.image}" alt="${issue.title}" class="w-full h-28 object-cover" onerror="this.src='https://images.unsplash.com/photo-1486325212027-8081e485255e?w=400&q=60'"/>
+          <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+          <div class="absolute bottom-2 left-2 right-8">
+            <span class="flex items-center gap-1 bg-white/90 text-xs font-semibold px-2 py-0.5 rounded-full ${status.color} w-fit">
+              <span class="w-1.5 h-1.5 rounded-full ${status.dot}"></span>${status.label}
+            </span>
+          </div>
+        </div>
+        <div class="p-3">
+          <h3 class="font-semibold text-sm text-gray-900 dark:text-white leading-tight mb-1 line-clamp-2">${issue.title}</h3>
+          <div class="flex items-center gap-1 text-xs text-gray-500 mb-2">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+            ${issue.location}
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1 text-xs ${heat.text} font-bold ${heat.light} px-2 py-0.5 rounded-full">🔥 ${issue.heatScore}</div>
+            <div class="flex items-center gap-1 text-xs text-gray-500">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
+              ${issue.upvotes}
+            </div>
+            <a href="issue.html?id=${issue.id}" class="text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">View →</a>
+          </div>
+        </div>`;
+
+      // Position popup
+      const mapEl = document.getElementById('svg-map');
+      const mapRect = mapEl.getBoundingClientRect();
+      let left = (px / 100) * mapRect.width;
+      let top = (py / 100) * mapRect.height;
+      if (left + 300 > mapRect.width) left -= 300;
+      if (top + 200 > mapRect.height) top -= 200;
+      popup.style.left = Math.max(8, left + 20) + 'px';
+      popup.style.top = Math.max(8, top) + 'px';
+      popup.classList.remove('hidden');
+
+      // Highlight list
+      document.querySelectorAll('.issue-list-item').forEach(el => el.classList.remove('active'));
+      document.querySelector(`[data-list-id="${id}"]`)?.classList.add('active');
+    }
+
+    function toggleHeatmap(btn) {
+      heatmapOn = !heatmapOn;
+      btn.classList.toggle('bg-indigo-500', heatmapOn);
+      btn.classList.toggle('bg-gray-200', !heatmapOn);
+      btn.classList.toggle('dark:bg-gray-700', !heatmapOn);
+      document.getElementById('heatmap-knob').style.transform = heatmapOn ? 'translateX(20px)' : 'translateX(0)';
+      renderMarkers();
+      Toast.show(heatmapOn ? 'Heatmap view enabled' : 'Heatmap view disabled', 'info', 1500);
+    }
+
+    function toggleMapStyle() {
+      darkMapOn = !darkMapOn;
+      const mapBg = document.querySelector('#svg-map > div');
+      if (darkMapOn) {
+        mapBg.style.background = 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #273344 100%)';
+        document.querySelectorAll('#svg-map .text-gray-500').forEach(el => {
+          el.className = el.className.replace('text-gray-500', 'text-gray-400');
+        });
+      } else {
+        mapBg.style.background = 'linear-gradient(135deg, #e8f4fd 0%, #d4e9f7 50%, #c1ddf1 100%)';
+      }
+    }
+
+    function filterMapList(val) {
+      mapSearch = val;
+      renderMapList();
+      renderMarkers();
+    }
+
+    function renderMapList() {
+      const container = document.getElementById('map-issue-list');
+      const query = mapSearch.toLowerCase();
+      const filtered = ISSUES.filter(i => !query || i.title.toLowerCase().includes(query) || i.location.toLowerCase().includes(query));
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="p-4 text-center text-sm text-gray-500">No issues found</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.sort((a,b) => b.heatScore - a.heatScore).map(issue => {
+        const heat = getHeatColor(issue.heatScore);
+        const pos = MARKER_POSITIONS.find(p => p.id === issue.id) || { x: 50, y: 50 };
+        return `
+          <div class="issue-list-item p-3 border-b border-gray-100 dark:border-gray-800 cursor-pointer"
+               data-list-id="${issue.id}"
+               onclick="showPopup(${issue.id}, ${pos.x}, ${pos.y})">
+            <div class="flex items-start gap-2">
+              <div class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${heat.bg}"></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1">${issue.title}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">${issue.location}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-xs ${heat.text} font-bold">🔥 ${issue.heatScore}</span>
+                  <span class="text-xs text-gray-400">·</span>
+                  <span class="text-xs text-gray-400">${issue.daysOpen}d</span>
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderNavbar('map.html');
+      renderBottomNav('map.html');
+      renderMapList();
+      renderMarkers();
+    });
+  </script>
+  <div id="bottom-nav" class="bottom-nav md:hidden"></div>
+</body>
+</html>

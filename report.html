@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CivicFix — Report Issue</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={darkMode:'class'}</script>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body class="min-h-screen transition-colors duration-300 page-bg-mesh dark:bg-gray-950">
+<div id="navbar"></div>
+
+<main class="max-w-3xl mx-auto px-4 sm:px-6 py-8 pt-24 pb-24">
+  <!-- Header -->
+  <div class="mb-8 fade-in-up">
+    <div class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+      <a href="index.html" class="hover:text-violet-600">Home</a>
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      <span>Report Issue</span>
+    </div>
+    <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white">Report a Civic Issue</h1>
+    <p class="text-gray-500 text-sm mt-1">Help your community. Every report counts!</p>
+  </div>
+
+  <!-- Duplicate Alert (hidden by default) -->
+  <div id="duplicate-alert" class="hidden mb-6 duplicate-alert">
+    <div class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-5">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/50 rounded-xl flex items-center justify-center flex-shrink-0">
+          <span class="text-xl">⚠️</span>
+        </div>
+        <div class="flex-1">
+          <p class="font-bold text-amber-800 dark:text-amber-300 mb-1">Similar issue already reported nearby!</p>
+          <p class="text-sm text-amber-700 dark:text-amber-400 mb-3">Instead of creating a duplicate, consider upvoting the existing issue to increase its priority.</p>
+          <div id="duplicate-list" class="space-y-2 mb-3"></div>
+          <div class="flex gap-2">
+            <button onclick="hideDuplicate()" class="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline">Report anyway →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress Steps -->
+  <div class="flex items-center gap-0 mb-8 fade-in-up-delay-1">
+    <div class="flex items-center" data-step="1">
+      <div id="circle-1" class="w-8 h-8 rounded-full bg-violet-600 text-white text-xs font-bold flex items-center justify-center shadow-lg shadow-indigo-200">1</div>
+      <div class="h-0.5 w-12 sm:w-20 bg-gray-200 dark:bg-gray-700" id="line-1"></div>
+    </div>
+    <div class="flex items-center" data-step="2">
+      <div id="circle-2" class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 text-xs font-bold flex items-center justify-center">2</div>
+      <div class="h-0.5 w-12 sm:w-20 bg-gray-200 dark:bg-gray-700" id="line-2"></div>
+    </div>
+    <div class="flex items-center" data-step="3">
+      <div id="circle-3" class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 text-xs font-bold flex items-center justify-center">3</div>
+    </div>
+    <div class="ml-4 hidden sm:block">
+      <p class="text-xs font-semibold text-gray-900 dark:text-white" id="step-title">Step 1: Category & Details</p>
+      <p class="text-xs text-gray-500">3 steps</p>
+    </div>
+  </div>
+
+  <form id="report-form" onsubmit="submitReport(event)">
+    <!-- STEP 1 -->
+    <div id="step-1" class="space-y-5">
+      <div class="glass-card rounded-2xl p-5">
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Category <span class="text-red-500">*</span></label>
+        <div class="grid grid-cols-4 sm:grid-cols-5 gap-2" id="category-grid"></div>
+        <input type="hidden" id="selected-category" required/>
+      </div>
+      <div class="glass-card rounded-2xl p-5">
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Title <span class="text-red-500">*</span></label>
+        <input type="text" id="issue-title" placeholder="e.g. Large pothole near MG Road junction" class="form-input" maxlength="100" oninput="updateCharCount(this,'title-count',100);checkDuplicates()" required/>
+        <div class="flex justify-end mt-1"><span class="text-xs text-gray-400" id="title-count">0/100</span></div>
+      </div>
+      <div class="glass-card rounded-2xl p-5">
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Description <span class="text-red-500">*</span></label>
+        <textarea id="issue-desc" rows="4" placeholder="Describe the issue in detail — location, severity, how long it's been there…" class="form-input resize-none" maxlength="500" oninput="updateCharCount(this,'desc-count',500)" required></textarea>
+        <div class="flex justify-end mt-1"><span class="text-xs text-gray-400" id="desc-count">0/500</span></div>
+      </div>
+      <button type="button" onclick="nextStep(2)" class="btn-primary w-full justify-center py-3 text-base">
+        Continue <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="step-2" class="space-y-5 hidden">
+      <!-- Image -->
+      <div class="glass-card rounded-2xl p-5">
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Photo Evidence <span class="text-gray-400 font-normal">(recommended)</span></label>
+        <div id="drop-zone" class="drop-zone p-8 text-center cursor-pointer hover:bg-violet-50 dark:hover:bg-violet-950/20 transition-colors rounded-xl"
+             ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)"
+             onclick="document.getElementById('file-input').click()">
+          <div id="upload-placeholder">
+            <div class="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <svg class="w-6 h-6 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </div>
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Drag & drop photo here</p>
+            <p class="text-xs text-gray-400 mt-1">or click to browse · PNG, JPG up to 10MB</p>
+          </div>
+          <div id="upload-preview" class="hidden">
+            <img id="preview-img" src="" alt="Preview" class="max-h-48 mx-auto rounded-xl object-cover shadow-lg"/>
+            <p class="text-xs text-gray-500 mt-2" id="file-name"></p>
+            <button type="button" onclick="removeImage(event)" class="mt-2 text-xs text-red-500 hover:text-red-700 font-medium">Remove</button>
+          </div>
+        </div>
+        <input type="file" id="file-input" accept="image/*" class="hidden" onchange="handleFileInput(this)"/>
+      </div>
+
+      <!-- Location -->
+      <div class="glass-card rounded-2xl p-5">
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Location <span class="text-red-500">*</span></label>
+        <div class="flex gap-2 mb-3">
+          <input type="text" id="location-input" placeholder="Type address or use GPS…" class="form-input flex-1" required oninput="onLocationChange(this.value)"/>
+          <button type="button" onclick="detectLocation()" id="gps-btn"
+                  class="flex items-center gap-1.5 bg-violet-50 dark:bg-indigo-900/30 text-violet-600 px-3 py-2 rounded-xl text-sm font-semibold border border-violet-200 hover:bg-violet-100 transition-colors whitespace-nowrap">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+            <span id="gps-label">GPS</span>
+          </button>
+        </div>
+        <!-- Map Preview -->
+        <div class="h-36 rounded-xl overflow-hidden relative bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-700">
+          <div id="loc-placeholder" class="absolute inset-0 flex items-center justify-center">
+            <div class="text-center">
+              <svg class="w-8 h-8 text-violet-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+              <p class="text-xs text-violet-500 font-medium">Enter location to preview</p>
+            </div>
+          </div>
+          <div id="loc-pin" class="hidden absolute inset-0 flex items-center justify-center">
+            <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" class="absolute inset-0 opacity-20"><pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0L0 0 0 40" fill="none" stroke="#94a3b8" stroke-width="0.5"/></pattern><rect width="100%" height="100%" fill="url(#g)"/></svg>
+            <div class="relative z-10 text-center">
+              <div class="w-10 h-10 bg-violet-600 rounded-full flex items-center justify-center mx-auto shadow-xl animate-bounce">
+                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>
+              </div>
+              <p class="text-xs font-semibold text-gray-700 dark:text-gray-300 mt-2" id="map-loc-label">Location set</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button type="button" onclick="nextStep(1)" class="btn-secondary flex-1 justify-center py-3">← Back</button>
+        <button type="button" onclick="nextStep(3)" class="btn-primary flex-1 justify-center py-3">Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div id="step-3" class="space-y-5 hidden">
+      <div class="glass-card rounded-2xl p-5">
+        <h3 class="font-bold text-gray-900 dark:text-white mb-4">Review Your Report</h3>
+        <div class="space-y-3" id="review-content"></div>
+      </div>
+      <!-- Urgency -->
+      <div class="glass-card rounded-2xl p-5">
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Urgency Level</label>
+        <div class="flex gap-2">
+          <label class="flex-1 cursor-pointer"><input type="radio" name="urgency" value="low" class="sr-only peer"/>
+            <div class="peer-checked:border-green-500 peer-checked:bg-green-50 dark:peer-checked:bg-green-950/20 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3 text-center transition-all hover:border-gray-300"><div class="text-lg mb-1">🟢</div><div class="text-xs font-semibold text-gray-700 dark:text-gray-300">Low</div></div>
+          </label>
+          <label class="flex-1 cursor-pointer"><input type="radio" name="urgency" value="medium" class="sr-only peer" checked/>
+            <div class="peer-checked:border-yellow-500 peer-checked:bg-yellow-50 dark:peer-checked:bg-yellow-950/20 border-2 border-yellow-400 rounded-xl p-3 text-center transition-all"><div class="text-lg mb-1">🟡</div><div class="text-xs font-semibold text-gray-700 dark:text-gray-300">Medium</div></div>
+          </label>
+          <label class="flex-1 cursor-pointer"><input type="radio" name="urgency" value="high" class="sr-only peer"/>
+            <div class="peer-checked:border-red-500 peer-checked:bg-red-50 dark:peer-checked:bg-red-950/20 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3 text-center transition-all hover:border-gray-300"><div class="text-lg mb-1">🔴</div><div class="text-xs font-semibold text-gray-700 dark:text-gray-300">High</div></div>
+          </label>
+        </div>
+      </div>
+      <!-- Anonymous -->
+      <div class="glass-card rounded-2xl p-4 flex items-center justify-between">
+        <div><p class="text-sm font-semibold text-gray-900 dark:text-white">Report Anonymously</p><p class="text-xs text-gray-500">Your name won't be shown publicly</p></div>
+        <button type="button" onclick="toggleAnon(this)" id="anon-toggle" class="w-12 h-6 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer transition-colors">
+          <span class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform" id="anon-knob"></span>
+        </button>
+      </div>
+      <div class="flex gap-3">
+        <button type="button" onclick="nextStep(2)" class="btn-secondary flex-1 justify-center py-3">← Back</button>
+        <button type="submit" id="submit-btn" class="btn-primary flex-1 justify-center py-3 text-base">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Submit Report
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Success -->
+  <div id="success-state" class="hidden text-center py-12 fade-in-up">
+    <div class="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+    </div>
+    <h2 class="text-2xl font-extrabold text-gray-900 dark:text-white mb-2">Issue Reported! 🎉</h2>
+    <p class="text-gray-500 mb-2 max-w-sm mx-auto">Your report is now live. Citizens can upvote it to escalate priority.</p>
+    <p class="text-xs text-violet-600 dark:text-violet-400 font-semibold mb-6" id="issue-id-msg"></p>
+    <div class="flex gap-3 justify-center flex-wrap">
+      <a href="index.html" class="btn-primary">View in Feed</a>
+      <a href="profile.html" class="btn-secondary">My Reports</a>
+    </div>
+  </div>
+</main>
+
+<div id="bottom-nav" class="bottom-nav md:hidden"></div>
+
+<script src="js/data.js"></script>
+<script src="js/components.js"></script>
+<script>
+let currentStep=1, anonMode=false, selectedFile=null, dupDismissed=false;
+
+function initCategories(){
+  const grid=document.getElementById('category-grid');
+  grid.innerHTML=CATEGORIES.map(cat=>`
+    <button type="button" onclick="selectCategory('${cat.id}',this)"
+            class="category-card flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700">
+      <span class="text-xl">${cat.icon}</span>
+      <span class="text-[10px] font-semibold text-gray-600 dark:text-gray-400 text-center leading-tight">${cat.label}</span>
+    </button>`).join('');
+}
+
+function selectCategory(id,btn){
+  document.querySelectorAll('.category-card').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('selected-category').value=id;
+  checkDuplicates();
+}
+
+function checkDuplicates(){
+  if(dupDismissed) return;
+  const cat=document.getElementById('selected-category').value;
+  const loc=document.getElementById('location-input')?.value||document.getElementById('issue-title').value;
+  if(!cat||loc.length<5) return;
+  const similar=findSimilarIssues(loc,cat);
+  if(similar.length===0){document.getElementById('duplicate-alert').classList.add('hidden');return;}
+  const list=document.getElementById('duplicate-list');
+  list.innerHTML=similar.slice(0,2).map(i=>{
+    const heat=getHeatColor(i.heatScore);
+    const upvoted=upvotedIssues.has(i.id);
+    return `<div class="flex items-center gap-3 bg-white dark:bg-gray-800 rounded-xl p-3 border border-amber-100 dark:border-amber-900/30">
+      <img src="${i.image}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0" onerror="this.src='https://placehold.co/40'"/>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1">${i.title}</p>
+        <p class="text-[10px] text-gray-500">${i.location} · <span class="${heat.text} font-bold">🔥${i.heatScore}</span></p>
+      </div>
+      <button onclick="quickUpvote(${i.id},this)" class="text-xs font-bold px-2 py-1 rounded-lg ${upvoted?'bg-violet-600 text-white':'bg-indigo-100 text-violet-600 hover:bg-violet-200'} transition-colors whitespace-nowrap">
+        ${upvoted?'✓ Upvoted':'👍 Upvote'}
+      </button>
+    </div>`;
+  }).join('');
+  document.getElementById('duplicate-alert').classList.remove('hidden');
+}
+
+function quickUpvote(id,btn){
+  const issue=ISSUES.find(i=>i.id===id);if(!issue)return;
+  if(!upvotedIssues.has(id)){upvotedIssues.add(id);issue.upvotes++;saveUpvoted();btn.className='text-xs font-bold px-2 py-1 rounded-lg bg-violet-600 text-white whitespace-nowrap';btn.textContent='✓ Upvoted';Toast.show('Upvoted! Issue priority increased 👍','success');}
+}
+
+function hideDuplicate(){dupDismissed=true;document.getElementById('duplicate-alert').classList.add('hidden');}
+
+function updateCharCount(el,id,max){
+  const c=el.value.length; const e=document.getElementById(id);
+  e.textContent=`${c}/${max}`; e.classList.toggle('text-red-500',c>=max*0.9);
+}
+
+function nextStep(step){
+  if(step===2){
+    const cat=document.getElementById('selected-category').value;
+    const title=document.getElementById('issue-title').value.trim();
+    const desc=document.getElementById('issue-desc').value.trim();
+    if(!cat){Toast.show('Please select a category','warning');return;}
+    if(!title){Toast.show('Please enter a title','warning');document.getElementById('issue-title').focus();return;}
+    if(desc.length<20){Toast.show('Please add more details (min 20 chars)','warning');return;}
+  }
+  if(step===3){
+    const loc=document.getElementById('location-input').value.trim();
+    if(!loc){Toast.show('Please enter location','warning');document.getElementById('location-input').focus();return;}
+    renderReview();
+  }
+  document.getElementById(`step-${currentStep}`).classList.add('hidden');
+  document.getElementById(`step-${step}`).classList.remove('hidden');
+  currentStep=step;
+  const titles={1:'Step 1: Category & Details',2:'Step 2: Photo & Location',3:'Step 3: Review & Submit'};
+  document.getElementById('step-title').textContent=titles[step];
+  for(let i=1;i<=3;i++){
+    const c=document.getElementById(`circle-${i}`);
+    if(i<step){c.className='w-8 h-8 rounded-full bg-green-500 text-white text-xs font-bold flex items-center justify-center shadow-lg';c.innerHTML='<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>';}
+    else if(i===step){c.className='w-8 h-8 rounded-full bg-violet-600 text-white text-xs font-bold flex items-center justify-center shadow-lg shadow-indigo-200';c.textContent=i;}
+    else{c.className='w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 text-xs font-bold flex items-center justify-center';c.textContent=i;}
+    if(i<3){const l=document.getElementById(`line-${i}`);if(l)l.className=`h-0.5 w-12 sm:w-20 transition-colors ${i<step?'bg-green-400':'bg-gray-200 dark:bg-gray-700'}`;}
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function renderReview(){
+  const cat=getCategoryInfo(document.getElementById('selected-category').value);
+  const title=document.getElementById('issue-title').value;
+  const desc=document.getElementById('issue-desc').value;
+  const loc=document.getElementById('location-input').value;
+  document.getElementById('review-content').innerHTML=`
+    <div class="flex items-center gap-3 py-2 border-b border-gray-100 dark:border-gray-800">
+      <span class="text-2xl">${cat.icon}</span>
+      <div><p class="text-xs text-gray-400">Category</p><p class="text-sm font-semibold text-gray-900 dark:text-white">${cat.label}</p></div>
+    </div>
+    <div class="py-2 border-b border-gray-100 dark:border-gray-800">
+      <p class="text-xs text-gray-400 mb-0.5">Title</p><p class="text-sm font-semibold text-gray-900 dark:text-white">${title}</p>
+    </div>
+    <div class="py-2 border-b border-gray-100 dark:border-gray-800">
+      <p class="text-xs text-gray-400 mb-0.5">Description</p><p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">${desc}</p>
+    </div>
+    <div class="py-2 flex items-center gap-2">
+      <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+      <p class="text-sm text-gray-600 dark:text-gray-400">${loc}</p>
+    </div>`;
+}
+
+function onLocationChange(val){
+  const placeholder=document.getElementById('loc-placeholder');
+  const pin=document.getElementById('loc-pin');
+  const lbl=document.getElementById('map-loc-label');
+  if(val.length>3){placeholder.classList.add('hidden');pin.classList.remove('hidden');lbl.textContent=val.substring(0,40);}
+  else{placeholder.classList.remove('hidden');pin.classList.add('hidden');}
+  checkDuplicates();
+}
+
+function detectLocation(){
+  const btn=document.getElementById('gps-btn');
+  const lbl=document.getElementById('gps-label');
+  lbl.textContent='…';btn.disabled=true;
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const LOCS=['Koramangala 5th Block, Bengaluru','Indiranagar 12th Main, Bengaluru','HSR Layout Sector 2, Bengaluru','MG Road Junction, Bengaluru','Whitefield Main Rd, Bengaluru'];
+      const loc=LOCS[Math.floor(Math.random()*LOCS.length)];
+      document.getElementById('location-input').value=loc;
+      lbl.textContent='✓';btn.disabled=false;
+      onLocationChange(loc);Toast.show('Location detected! 📍','success',2000);
+    },()=>{
+      document.getElementById('location-input').value='Bengaluru, Karnataka';
+      lbl.textContent='GPS';btn.disabled=false;
+      onLocationChange('Bengaluru, Karnataka');Toast.show('Using approximate location','info',2000);
+    });
+  }else{lbl.textContent='GPS';btn.disabled=false;}
+}
+
+function handleDragOver(e){e.preventDefault();document.getElementById('drop-zone').classList.add('drag-over');}
+function handleDragLeave(){document.getElementById('drop-zone').classList.remove('drag-over');}
+function handleDrop(e){e.preventDefault();document.getElementById('drop-zone').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))processFile(f);else Toast.show('Please drop an image','warning');}
+function handleFileInput(input){if(input.files[0])processFile(input.files[0]);}
+function processFile(file){
+  selectedFile=file;
+  const r=new FileReader();
+  r.onload=e=>{
+    document.getElementById('preview-img').src=e.target.result;
+    document.getElementById('file-name').textContent=file.name+' · '+(file.size/1024/1024).toFixed(2)+'MB';
+    document.getElementById('upload-placeholder').classList.add('hidden');
+    document.getElementById('upload-preview').classList.remove('hidden');
+    Toast.show('Photo added!','success',1500);
+  };
+  r.readAsDataURL(file);
+}
+function removeImage(e){e.stopPropagation();selectedFile=null;document.getElementById('upload-placeholder').classList.remove('hidden');document.getElementById('upload-preview').classList.add('hidden');document.getElementById('file-input').value='';}
+function toggleAnon(btn){anonMode=!anonMode;btn.classList.toggle('bg-violet-500',anonMode);btn.classList.toggle('bg-gray-200',!anonMode);document.getElementById('anon-knob').style.transform=anonMode?'translateX(24px)':'translateX(0)';}
+
+function submitReport(e){
+  e.preventDefault();
+  const btn=document.getElementById('submit-btn');
+  btn.disabled=true;
+  btn.innerHTML=`<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Submitting…`;
+  setTimeout(()=>{
+    const imgEl=document.getElementById('preview-img');
+    const newIssue=addNewIssue({
+      title:document.getElementById('issue-title').value,
+      description:document.getElementById('issue-desc').value,
+      category:document.getElementById('selected-category').value,
+      location:document.getElementById('location-input').value,
+      imageUrl:imgEl.src||'',
+    });
+    document.getElementById('report-form').classList.add('hidden');
+    document.getElementById('success-state').classList.remove('hidden');
+    document.getElementById('issue-id-msg').textContent=`Issue #${newIssue.id} · Now visible in All Issues & Nearby feed`;
+    Toast.show('Issue reported! 🎉','success',4000);
+  },2000);
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  renderNavbar('report.html');
+  renderBottomNav('report.html');
+  initCategories();
+  // Pre-fill location from saved
+  if(userLocation){
+    document.getElementById('location-input')?.setAttribute('placeholder',`Near ${userLocation.area||'your location'}`);
+  }
+});
+</script>
+</body>
+</html>

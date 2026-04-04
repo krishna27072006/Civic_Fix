@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CivicFix — Issue Detail</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={darkMode:'class'}</script>
+  <link rel="stylesheet" href="css/style.css"/>
+  <style>
+    @keyframes upvote-pop{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
+    .upvote-pop{animation:upvote-pop 0.3s cubic-bezier(0.175,0.885,0.32,1.275);}
+    .voted{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border-color:transparent;}
+    .progress-card{border-left:3px solid #6366f1;background:linear-gradient(to right,#f5f3ff,white);}
+    .dark .progress-card{background:linear-gradient(to right,#1e1b4b,#1e293b);}
+  </style>
+</head>
+<body class="min-h-screen transition-colors duration-300 page-bg-mesh dark:bg-gray-950">
+<div id="navbar"></div>
+
+<main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 pt-24 pb-24" id="issue-main">
+  <!-- Skeleton -->
+  <div id="loading-state" class="space-y-4">
+    <div class="skel h-4 rounded w-48"></div>
+    <div class="skel h-72 rounded-2xl"></div>
+    <div class="grid grid-cols-3 gap-4"><div class="skel h-20 rounded-xl"></div><div class="skel h-20 rounded-xl"></div><div class="skel h-20 rounded-xl"></div></div>
+    <div class="skel h-40 rounded-2xl"></div>
+  </div>
+  <div id="issue-content" class="hidden"></div>
+  <div id="not-found" class="hidden text-center py-16">
+    <div class="text-6xl mb-4">🔍</div>
+    <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-2">Issue not found</h2>
+    <a href="index.html" class="btn-primary">Back to Feed</a>
+  </div>
+</main>
+
+<!-- Mobile sticky actions -->
+<div id="mobile-actions" class="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-200 dark:border-gray-700 p-3 z-40 md:hidden hidden">
+  <div class="flex gap-2">
+    <button id="mob-upvote" class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-violet-200 dark:border-violet-800 text-violet-600 font-semibold text-sm hover:bg-violet-50 transition-all">👍 Upvote</button>
+    <button onclick="markNotFixed()" class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-orange-200 dark:border-orange-800 text-orange-600 font-semibold text-sm hover:bg-orange-50 transition-all">⚠️ Not Fixed</button>
+  </div>
+</div>
+
+<!-- Review Modal -->
+<div id="review-modal" class="hidden fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 scale-in">
+    <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Leave a Review ⭐</h2>
+    <p class="text-sm text-gray-500 mb-4">How well was this issue resolved?</p>
+    <div class="flex gap-2 justify-center mb-4" id="star-row">
+      ${[1,2,3,4,5].map(n=>`<button type="button" onclick="setReviewRating(${n})" class="text-3xl text-gray-300 hover:text-yellow-400 transition-all review-star" data-star="${n}">★</button>`).join('')}
+    </div>
+    <textarea id="review-text-field" rows="3" placeholder="Share your experience…" class="form-input resize-none mb-4"></textarea>
+    <div class="flex gap-3">
+      <button onclick="document.getElementById('review-modal').classList.add('hidden')" class="btn-secondary flex-1 justify-center">Cancel</button>
+      <button onclick="submitIssueReview()" class="btn-primary flex-1 justify-center">Submit</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/components.js"></script>
+<script>
+let reviewRating=0, currentIssueId=null;
+
+function setReviewRating(n){
+  reviewRating=n;
+  document.querySelectorAll('.review-star').forEach(s=>{
+    s.className=`text-3xl transition-all review-star ${parseInt(s.dataset.star)<=n?'text-yellow-400':'text-gray-300'} hover:text-yellow-400`;
+  });
+}
+
+function submitIssueReview(){
+  if(reviewRating===0){Toast.show('Please select a rating','warning');return;}
+  const issue=ISSUES.find(i=>i.id===currentIssueId);
+  if(issue){
+    issue.reviews.push({user:currentUser?.name||'Anonymous',rating:reviewRating,text:document.getElementById('review-text-field').value||'Good resolution!',date:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})});
+    localStorage.setItem('civicIssues',JSON.stringify(ISSUES));
+  }
+  document.getElementById('review-modal').classList.add('hidden');
+  Toast.show('Review submitted! ⭐ Thank you','success',2000);
+  setTimeout(renderIssuePage,500);
+}
+
+function markNotFixed(){Toast.show('Marked as "Still Not Fixed" — Heat score will increase!','warning',3000);}
+function shareIssue(){
+  if(navigator.share)navigator.share({title:'CivicFix Issue',url:window.location.href});
+  else{navigator.clipboard?.writeText(window.location.href);Toast.show('Link copied!','success',1500);}
+}
+
+function handleUpvote(id,btn){
+  const issue=ISSUES.find(i=>i.id===id);if(!issue)return;
+  const label=document.getElementById('upvote-label');
+  btn.classList.add('upvote-pop');setTimeout(()=>btn.classList.remove('upvote-pop'),350);
+  if(upvotedIssues.has(id)){
+    upvotedIssues.delete(id);issue.upvotes--;
+    btn.className='upvote-btn w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-violet-200 dark:border-violet-800 text-violet-600 dark:text-violet-400 hover:bg-violet-50 font-semibold text-sm transition-all';
+    btn.querySelector('svg').setAttribute('fill','none');
+    if(label)label.textContent=`Upvote · ${issue.upvotes}`;
+    Toast.show('Upvote removed','info',1500);
+  }else{
+    upvotedIssues.add(id);issue.upvotes++;
+    btn.className='upvote-btn voted w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 font-semibold text-sm transition-all';
+    btn.querySelector('svg').setAttribute('fill','currentColor');
+    if(label)label.textContent=`Upvoted · ${issue.upvotes}`;
+    Toast.show('Issue upvoted! 👍','success',1500);
+  }
+  saveUpvoted();
+  const mob=document.getElementById('mob-upvote');
+  if(mob)mob.textContent=upvotedIssues.has(id)?'✅ Upvoted':'👍 Upvote';
+}
+
+function renderIssuePage(){
+  const params=new URLSearchParams(window.location.search);
+  const id=parseInt(params.get('id'));
+  const issue=ISSUES.find(i=>i.id===id);
+  currentIssueId=id;
+  document.getElementById('loading-state').classList.add('hidden');
+  if(!issue){document.getElementById('not-found').classList.remove('hidden');return;}
+  document.title=`CivicFix — ${issue.title}`;
+  const heat=getHeatColor(issue.heatScore);
+  const status=STATUSES[issue.status];
+  const cat=getCategoryInfo(issue.category);
+  const upvoted=upvotedIssues.has(id);
+  const avgRating=issue.reviews.length>0?Math.round(issue.reviews.reduce((s,r)=>s+r.rating,0)/issue.reviews.length):0;
+
+  document.getElementById('issue-content').classList.remove('hidden');
+  document.getElementById('mobile-actions').classList.remove('hidden');
+
+  document.getElementById('issue-content').innerHTML=`
+    <!-- Breadcrumb -->
+    <div class="flex items-center gap-2 text-sm text-gray-500 mb-4 fade-in-up overflow-hidden">
+      <a href="index.html" class="hover:text-violet-600 transition-colors flex-shrink-0">Home</a>
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      <span class="truncate">${issue.title}</span>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Left -->
+      <div class="lg:col-span-2 space-y-5">
+        <!-- Image -->
+        <div class="relative rounded-2xl overflow-hidden shadow-xl fade-in-up">
+          <img src="${issue.image}" alt="${issue.title}" class="w-full h-72 object-cover" onerror="this.src='https://images.unsplash.com/photo-1486325212027-8081e485255e?w=800&q=80'"/>
+          <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+          <div class="absolute top-4 left-4 flex gap-2 flex-wrap">
+            <span class="flex items-center gap-1 bg-white/90 backdrop-blur text-xs font-semibold px-3 py-1.5 rounded-full ${status.color}">
+              <span class="w-1.5 h-1.5 rounded-full ${status.dot}"></span>${status.label}
+            </span>
+            <span class="bg-white/90 backdrop-blur text-xs font-semibold px-3 py-1.5 rounded-full text-gray-700">${cat.icon} ${cat.label}</span>
+          </div>
+          <div class="absolute top-4 right-4">
+            <div class="flex items-center gap-1 ${heat.bg} text-white text-sm font-bold px-3 py-1.5 rounded-full shadow-lg ${issue.heatScore>=80?'heat-pulse':''}">🔥 ${issue.heatScore}</div>
+          </div>
+          <div class="absolute bottom-4 left-4 right-4">
+            <h1 class="text-white font-bold text-lg leading-tight drop-shadow-lg">${issue.title}</h1>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-3 gap-3 fade-in-up-delay-1">
+          <div class="stat-card text-center"><div class="text-2xl font-extrabold text-violet-600 dark:text-violet-400">${issue.upvotes}</div><div class="text-xs text-gray-500 mt-0.5">Upvotes</div></div>
+          <div class="stat-card text-center"><div class="text-2xl font-extrabold ${heat.text}">${issue.heatScore}</div><div class="text-xs text-gray-500 mt-0.5">Heat Score</div></div>
+          <div class="stat-card text-center"><div class="text-2xl font-extrabold text-orange-500">${issue.daysOpen}</div><div class="text-xs text-gray-500 mt-0.5">Days Pending</div></div>
+        </div>
+
+        <!-- Description -->
+        <div class="glass-card rounded-2xl p-5 fade-in-up-delay-1">
+          <h2 class="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Description
+          </h2>
+          <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">${issue.description}</p>
+        </div>
+
+        <!-- Progress Updates -->
+        ${issue.progressUpdates.length > 0 ? `
+        <div class="glass-card rounded-2xl p-5 fade-in-up-delay-2">
+          <h2 class="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+            Admin Updates (${issue.progressUpdates.length})
+          </h2>
+          <div class="space-y-3">
+            ${issue.progressUpdates.map(u=>`
+              <div class="progress-card rounded-xl p-4">
+                <div class="flex items-center justify-between mb-1">
+                  <p class="text-xs font-bold text-indigo-700 dark:text-violet-400">${u.admin}</p>
+                  <p class="text-xs text-gray-400">${u.date}</p>
+                </div>
+                <p class="text-sm text-gray-700 dark:text-gray-300">${u.text}</p>
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
+
+        <!-- Timeline -->
+        <div class="glass-card rounded-2xl p-5 fade-in-up-delay-2">
+          <h2 class="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Progress Timeline
+          </h2>
+          <div class="space-y-1 pl-2">
+            ${issue.timeline.map((item,i)=>`
+              <div class="timeline-item ${item.done?'done':''} flex items-start gap-3 pb-4">
+                <div class="flex-shrink-0 w-5 h-5 rounded-full mt-0.5 flex items-center justify-center ${item.done?'bg-violet-600':'bg-gray-200 dark:bg-gray-700'}">
+                  ${item.done?`<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>`:`<div class="w-2 h-2 rounded-full bg-gray-400"></div>`}
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-semibold ${item.done?'text-gray-900 dark:text-white':'text-gray-400 dark:text-gray-500'}">${item.event}</p>
+                  <p class="text-xs ${item.done?'text-gray-500':'text-gray-300 dark:text-gray-600'}">${item.date||'Pending'}</p>
+                </div>
+                ${i===issue.timeline.filter(t=>t.done).length-1&&item.done?'<span class="text-[10px] bg-indigo-100 dark:bg-indigo-900/40 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-full font-semibold">Current</span>':''}
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <!-- Location -->
+        <div class="glass-card rounded-2xl p-5 fade-in-up-delay-2">
+          <h2 class="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+            Location — <a href="map.html" class="text-xs text-violet-600 hover:underline ml-1">View on Map →</a>
+          </h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">${issue.location}</p>
+          <div class="h-32 rounded-xl relative overflow-hidden" style="background:linear-gradient(135deg,#e8f4fd,#c1ddf1)">
+            <svg width="100%" height="100%" class="absolute inset-0 opacity-20"><pattern id="g4" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0L0 0 0 40" fill="none" stroke="#94a3b8" stroke-width="0.5"/></pattern><rect width="100%" height="100%" fill="url(#g4)"/></svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="text-center">
+                <div class="w-10 h-10 ${heat.bg} rounded-full flex items-center justify-center mx-auto shadow-xl animate-bounce">
+                  <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>
+                </div>
+                <p class="text-xs font-semibold text-gray-700 dark:text-gray-300 mt-1">${issue.location}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reviews Section -->
+        <div class="glass-card rounded-2xl p-5 fade-in-up-delay-3" id="reviews-section">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              ⭐ Reviews ${issue.reviews.length>0?`<span class="text-sm font-normal text-gray-500">(${issue.reviews.length})</span>`:''}
+            </h2>
+            ${issue.status==='resolved'?`<button onclick="document.getElementById('review-modal').classList.remove('hidden')" class="btn-secondary text-xs py-1.5 px-3">+ Write Review</button>`:''}
+          </div>
+          ${issue.reviews.length>0 ? `
+            ${avgRating>0?`<div class="flex items-center gap-3 mb-4 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-xl border border-yellow-200 dark:border-yellow-900/30">
+              <div class="text-3xl font-extrabold text-yellow-500">${avgRating}</div>
+              <div>
+                <div class="flex">${getStars(avgRating)}</div>
+                <p class="text-xs text-gray-500 mt-0.5">Based on ${issue.reviews.length} review${issue.reviews.length>1?'s':''}</p>
+              </div>
+            </div>`:''}
+            <div class="space-y-3">
+              ${issue.reviews.map(r=>`
+                <div class="border border-gray-100 dark:border-gray-700 rounded-xl p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                      <div class="w-7 h-7 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-lg flex items-center justify-center text-white text-xs font-bold">${r.user.charAt(0)}</div>
+                      <span class="text-sm font-semibold text-gray-900 dark:text-white">${r.user}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <div class="flex">${getStars(r.rating)}</div>
+                      <span class="text-xs text-gray-400">${r.date}</span>
+                    </div>
+                  </div>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">${r.text}</p>
+                </div>`).join('')}
+            </div>` : `
+            <div class="text-center py-8">
+              <div class="text-4xl mb-2">⭐</div>
+              ${issue.status==='resolved'?`<p class="text-sm text-gray-500 mb-3">Be the first to review this resolution!</p><button onclick="document.getElementById('review-modal').classList.remove('hidden')" class="btn-primary text-sm">Write Review</button>`:
+              `<p class="text-sm text-gray-500">Reviews will be available once this issue is resolved.</p>`}
+            </div>`}
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="space-y-4">
+        <!-- Actions -->
+        <div class="glass-card rounded-2xl p-4 space-y-3 fade-in-up">
+          <h3 class="font-bold text-gray-900 dark:text-white text-sm">Actions</h3>
+          <button onclick="handleUpvote(${id},this)" id="upvote-btn"
+                  class="upvote-btn w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 ${upvoted?'voted':'border-violet-200 dark:border-violet-800 text-violet-600 dark:text-violet-400 hover:bg-violet-50'} font-semibold text-sm transition-all">
+            <svg class="w-5 h-5" fill="${upvoted?'currentColor':'none'}" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
+            <span id="upvote-label">${upvoted?`Upvoted · ${issue.upvotes}`:`Upvote · ${issue.upvotes}`}</span>
+          </button>
+          <button onclick="markNotFixed()" class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-orange-200 dark:border-orange-800 text-orange-600 font-semibold text-sm hover:bg-orange-50 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            Still Not Fixed
+          </button>
+          <button onclick="shareIssue()" class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 font-semibold text-sm hover:bg-gray-50 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+            Share Issue
+          </button>
+          ${currentUser?.isAdmin ? `
+            <div class="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-2">
+              <p class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Admin</p>
+              <button onclick="window.location.href='admin.html'" class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 text-blue-700 font-semibold text-sm hover:bg-blue-100 transition-all">📢 Post Progress Update</button>
+            </div>` : ''}
+        </div>
+
+        <!-- Reporter -->
+        <div class="glass-card rounded-2xl p-4 fade-in-up-delay-1">
+          <h3 class="font-bold text-gray-900 dark:text-white text-sm mb-3">Reported By</h3>
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">${issue.reportedBy.charAt(0)}</div>
+            <div>
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">${issue.reportedBy}</p>
+              <p class="text-xs text-gray-500">${timeAgo(issue.reportedAt)} · ${issue.reportedAt}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Heat Meter -->
+        <div class="glass-card rounded-2xl p-4 fade-in-up-delay-1">
+          <h3 class="font-bold text-gray-900 dark:text-white text-sm mb-3">🔥 Heat Score</h3>
+          <div class="flex items-end gap-1 mb-2">
+            <span class="text-4xl font-extrabold ${heat.text}">${issue.heatScore}</span>
+            <span class="text-gray-400 text-sm mb-1.5">/100</span>
+          </div>
+          <div class="w-full h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
+            <div class="h-full ${heat.bg} rounded-full progress-animated" style="width:${issue.heatScore}%"></div>
+          </div>
+          <p class="text-xs text-gray-500">${issue.heatScore>=80?'🔴 Critical — Urgent attention needed':issue.heatScore>=60?'🟡 High — May escalate soon':issue.heatScore>=40?'🟡 Medium — Monitored':'🟢 Low — In queue'}</p>
+        </div>
+
+        <!-- Progress Summary -->
+        ${issue.progressUpdates.length>0?`
+        <div class="glass-card rounded-2xl p-4 fade-in-up-delay-2">
+          <h3 class="font-bold text-gray-900 dark:text-white text-sm mb-3 flex items-center gap-1.5">📢 Latest Update</h3>
+          <div class="progress-card rounded-xl p-3">
+            <p class="text-xs font-semibold text-indigo-700 dark:text-violet-400 mb-0.5">${issue.progressUpdates[issue.progressUpdates.length-1].admin}</p>
+            <p class="text-xs text-gray-700 dark:text-gray-300">${issue.progressUpdates[issue.progressUpdates.length-1].text}</p>
+            <p class="text-[10px] text-gray-400 mt-1">${issue.progressUpdates[issue.progressUpdates.length-1].date}</p>
+          </div>
+        </div>`:'' }
+
+        <!-- Similar Issues -->
+        <div class="glass-card rounded-2xl p-4 fade-in-up-delay-2">
+          <h3 class="font-bold text-gray-900 dark:text-white text-sm mb-3">Similar Issues</h3>
+          <div class="space-y-2">
+            ${ISSUES.filter(i=>i.category===issue.category&&i.id!==id).slice(0,3).map(rel=>`
+              <a href="issue.html?id=${rel.id}" class="flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl p-2 transition-colors group">
+                <img src="${rel.image}" alt="" class="w-10 h-10 rounded-lg object-cover flex-shrink-0" onerror="this.src='https://placehold.co/40'"/>
+                <div class="min-w-0 flex-1">
+                  <p class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1 group-hover:text-violet-600">${rel.title}</p>
+                  <p class="text-[10px] text-gray-400">🔥 ${rel.heatScore} heat · ${rel.daysOpen}d</p>
+                </div>
+              </a>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  // Mobile upvote
+  document.getElementById('mob-upvote').onclick=()=>handleUpvote(id,document.getElementById('upvote-btn'));
+  document.getElementById('mob-upvote').textContent=upvoted?'✅ Upvoted':'👍 Upvote';
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  renderNavbar('');
+  renderBottomNav('');
+  setTimeout(renderIssuePage,700);
+});
+</script>
+</body>
+</html>
