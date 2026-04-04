@@ -186,6 +186,57 @@ function buildIssueAnalytics(issues = ISSUES) {
   };
 }
 
+function buildMonthlyReportSeries(issues = ISSUES, monthCount = 6) {
+  const now = new Date();
+  const months = Array.from({ length: monthCount }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (monthCount - 1 - index), 1);
+    return {
+      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+      label: date.toLocaleDateString('en-US', { month: 'short' }),
+      year: date.getFullYear()
+    };
+  });
+
+  const series = months.reduce((acc, month) => {
+    acc.reported[month.key] = 0;
+    acc.resolved[month.key] = 0;
+    return acc;
+  }, { reported: {}, resolved: {} });
+
+  issues.forEach((issue) => {
+    if (issue.reportedAt) {
+      const reportedDate = new Date(issue.reportedAt);
+      if (!Number.isNaN(reportedDate.getTime())) {
+        const key = `${reportedDate.getFullYear()}-${String(reportedDate.getMonth() + 1).padStart(2, '0')}`;
+        if (key in series.reported) {
+          series.reported[key] += 1;
+        }
+      }
+    }
+
+    const resolvedSource = issue.resolvedAt || (issue.status === 'resolved' ? issue.updatedAt : null);
+    if (resolvedSource) {
+      const resolvedDate = new Date(resolvedSource);
+      if (!Number.isNaN(resolvedDate.getTime())) {
+        const key = `${resolvedDate.getFullYear()}-${String(resolvedDate.getMonth() + 1).padStart(2, '0')}`;
+        if (key in series.resolved) {
+          series.resolved[key] += 1;
+        }
+      }
+    }
+  });
+
+  return {
+    labels: months.map((month) => month.label),
+    reported: months.map((month) => series.reported[month.key]),
+    resolved: months.map((month) => series.resolved[month.key]),
+    rangeLabel:
+      monthCount === 12
+        ? `${months[0].year} - ${months[months.length - 1].year}`
+        : `${months[0].label} ${months[0].year} - ${months[months.length - 1].label} ${months[months.length - 1].year}`
+  };
+}
+
 function getHeatColor(score) {
   if (score >= 80) return { bg: 'bg-red-500', text: 'text-red-600', light: 'bg-red-50 dark:bg-red-950/30', border: 'border-red-200', hex: '#ef4444' };
   if (score >= 60) return { bg: 'bg-orange-500', text: 'text-orange-600', light: 'bg-orange-50 dark:bg-orange-950/30', border: 'border-orange-200', hex: '#f97316' };

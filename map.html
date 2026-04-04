@@ -3,67 +3,19 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>CivicFix — Live Map</title>
+  <title>CivicFix - Live Map</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config={darkMode:'class'}</script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="css/style.css"/>
   <style>
     #map-view { width:100%; height:calc(100vh - 64px); position:relative; overflow:hidden; }
-    .marker-pin {
-      position:absolute; transform:translate(-50%,-100%);
-      cursor:pointer; transition:transform 0.2s, filter 0.2s;
-      z-index:2;
-    }
-    .marker-pin:hover { transform:translate(-50%,-100%) scale(1.3); filter:drop-shadow(0 4px 12px rgba(99,102,241,0.5)); z-index:10; }
-    .marker-pin svg { display:block; }
-    .pin-pulse {
-      position:absolute; bottom:-2px; left:50%; transform:translateX(-50%);
-      width:20px; height:8px; border-radius:50%;
-      animation:pinShadow 2s ease-in-out infinite;
-    }
-    @keyframes pinShadow { 0%,100%{opacity:0.4;transform:translateX(-50%) scaleX(1)} 50%{opacity:0.15;transform:translateX(-50%) scaleX(0.6)} }
-    .marker-tooltip {
-      position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
-      background:rgba(15,23,42,0.92); color:white; font-size:10px; font-weight:600;
-      padding:4px 8px; border-radius:8px; white-space:nowrap; pointer-events:none;
-      opacity:0; transition:opacity 0.15s; z-index:20;
-    }
-    .marker-pin:hover .marker-tooltip { opacity:1; }
-    .user-marker {
-      position:absolute; transform:translate(-50%,-50%);
-      z-index:5; pointer-events:none;
-    }
-    .user-dot {
-      width:16px; height:16px; border-radius:50%;
-      background:linear-gradient(135deg,#6366f1,#14b8a6);
-      border:3px solid white; box-shadow:0 0 0 4px rgba(99,102,241,0.3);
-      animation:userPulse 2s ease-in-out infinite;
-    }
-    @keyframes userPulse {
-      0%,100%{box-shadow:0 0 0 4px rgba(99,102,241,0.3);}
-      50%{box-shadow:0 0 0 10px rgba(99,102,241,0);}
-    }
-    .user-ring {
-      position:absolute; inset:-12px; border-radius:50%;
-      border:2px solid rgba(99,102,241,0.4);
-      animation:ringExpand 2s ease-out infinite;
-    }
-    @keyframes ringExpand { 0%{transform:scale(0.5);opacity:0.8} 100%{transform:scale(2);opacity:0} }
-    .cluster-badge {
-      position:absolute; bottom:calc(100%+2px); right:-6px;
-      background:linear-gradient(135deg,#f43f5e,#fb923c);
-      color:white; font-size:9px; font-weight:700;
-      padding:1px 5px; border-radius:9999px; border:1.5px solid white;
-    }
-    .map-bg-light {
-      background:linear-gradient(160deg,#e8f4fd 0%,#dbeafe 30%,#d1fae5 70%,#fce7f3 100%);
-    }
-    .map-bg-dark {
-      background:linear-gradient(160deg,#0f172a 0%,#0f1a2e 50%,#0a1a15 100%);
-    }
-    .location-search-result {
-      transition:background 0.15s;
-    }
+    #leaflet-map { width:100%; height:100%; }
+    .leaflet-container { background:#dbeafe; font-family:inherit; }
+    .leaflet-popup-content-wrapper { border-radius:18px; box-shadow:0 20px 45px rgba(15,23,42,0.18); }
+    .leaflet-popup-content { margin:0; width:280px !important; }
+    .leaflet-popup-tip { box-shadow:none; }
+    .location-search-result { transition:background 0.15s; }
     .location-search-result:hover { background:#f5f3ff; }
     .dark .location-search-result:hover { background:#1e1b4b; }
     .issue-list-item { transition:all 0.15s ease; cursor:pointer; }
@@ -73,20 +25,38 @@
     .dark .issue-list-item.active { background:#1e1b4b; border-left-color:#8b5cf6; }
     .cat-filter-btn { transition:all 0.15s ease; }
     .cat-filter-btn.active { background:linear-gradient(135deg,#8b5cf6,#14b8a6); color:white; box-shadow:0 2px 8px rgba(139,92,246,0.3); }
-    .road { stroke:#cbd5e1; }
-    .dark-map .road { stroke:#1e293b; }
-    .sidebar-panel { transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .map-overlay-btn {
+      background:rgba(255,255,255,0.94);
+      border:1px solid rgba(226,232,240,0.95);
+      box-shadow:0 18px 40px rgba(15,23,42,0.16);
+      backdrop-filter:blur(16px);
+    }
+    .dark .map-overlay-btn {
+      background:rgba(15,23,42,0.92);
+      border-color:rgba(51,65,85,0.9);
+    }
+    .issue-marker {
+      width:18px;
+      height:18px;
+      border-radius:9999px;
+      border:3px solid rgba(255,255,255,0.95);
+      box-shadow:0 10px 24px rgba(15,23,42,0.25);
+    }
+    .issue-marker.is-high {
+      box-shadow:0 0 0 8px rgba(239,68,68,0.18), 0 10px 24px rgba(15,23,42,0.25);
+      animation:markerPulse 2s ease-in-out infinite;
+    }
+    @keyframes markerPulse {
+      0%,100% { box-shadow:0 0 0 6px rgba(239,68,68,0.16), 0 10px 24px rgba(15,23,42,0.25); }
+      50% { box-shadow:0 0 0 12px rgba(239,68,68,0), 0 10px 24px rgba(15,23,42,0.25); }
+    }
   </style>
 </head>
 <body class="min-h-screen transition-colors duration-300 dark:bg-gray-950">
   <div id="navbar"></div>
 
   <div class="flex pt-16" style="height:100vh">
-
-    <!-- ── SIDEBAR ── -->
-    <div id="sidebar" class="w-80 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-r border-gray-200 dark:border-gray-700 flex flex-col z-20 shadow-xl hidden md:flex" style="height:calc(100vh - 64px)">
-
-      <!-- Location Search -->
+    <div id="sidebar" class="hidden md:flex w-80 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-r border-gray-200 dark:border-gray-700 flex-col z-20 shadow-xl" style="height:calc(100vh - 64px)">
       <div class="p-4 border-b border-gray-100 dark:border-gray-800">
         <div class="flex items-center justify-between mb-3">
           <h2 class="font-bold text-gray-900 dark:text-white text-base">Live Map</h2>
@@ -95,246 +65,115 @@
           </div>
         </div>
 
-        <!-- Location search -->
         <div class="relative mb-2">
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-          <input type="text" id="location-search" placeholder="Search location or area…"
-            class="form-input pl-9 text-sm pr-16"
-            oninput="handleLocationSearch(this.value)"
-            onkeydown="if(event.key==='Enter')searchLocation()"/>
-          <button onclick="detectMyLocation()" title="Use my live location"
-            class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg transition-all"
-            id="locate-btn" style="background:linear-gradient(135deg,#8b5cf6,#14b8a6)">
+          <input type="text" id="location-search" placeholder="Search location or area..." class="form-input pl-9 text-sm pr-16" oninput="handleLocationSearch(this.value)" onkeydown="if(event.key==='Enter')searchLocation()"/>
+          <button onclick="detectMyLocation()" title="Use my live location" class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg transition-all" id="locate-btn" style="background:linear-gradient(135deg,#8b5cf6,#14b8a6)">
             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
           </button>
         </div>
-        <!-- Location dropdown results -->
+
         <div id="location-dropdown" class="hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden mb-2 max-h-40 overflow-y-auto"></div>
-        <!-- Current location badge -->
+
         <div id="my-location-badge" class="hidden flex items-center gap-2 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 text-xs font-semibold px-3 py-2 rounded-xl">
           <div class="w-2 h-2 rounded-full bg-violet-500 animate-pulse"></div>
-          <span id="my-location-text">Locating…</span>
-          <button onclick="clearMyLocation()" class="ml-auto text-gray-400 hover:text-rose-500">✕</button>
+          <span id="my-location-text">Locating...</span>
+          <button onclick="clearMyLocation()" class="ml-auto text-gray-400 hover:text-rose-500">x</button>
         </div>
       </div>
 
-      <!-- Issue search -->
       <div class="px-4 py-2 border-b border-gray-100 dark:border-gray-800">
         <div class="relative">
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input type="text" id="issue-search" placeholder="Filter issues on map…" class="form-input pl-8 text-xs py-2" oninput="filterIssues(this.value)"/>
+          <input type="text" id="issue-search" placeholder="Filter issues on map..." class="form-input pl-8 text-xs py-2" oninput="filterIssues(this.value)"/>
         </div>
       </div>
 
-      <!-- Category filters -->
       <div class="px-4 py-2 border-b border-gray-100 dark:border-gray-800">
         <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Filter by Category</p>
-        <div class="flex flex-wrap gap-1.5" id="cat-filters">
-          <button onclick="setCatFilter('all',this)" class="cat-filter-btn active text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">All</button>
-          <button onclick="setCatFilter('Pothole',this)" class="cat-filter-btn text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">🕳 Pothole</button>
-          <button onclick="setCatFilter('Garbage',this)" class="cat-filter-btn text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">🗑 Garbage</button>
-          <button onclick="setCatFilter('Water',this)" class="cat-filter-btn text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">💧 Water</button>
-          <button onclick="setCatFilter('Sewage',this)" class="cat-filter-btn text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">🚰 Sewage</button>
-          <button onclick="setCatFilter('Street Light',this)" class="cat-filter-btn text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">💡 Light</button>
-        </div>
+        <div class="flex flex-wrap gap-1.5" id="cat-filters"></div>
       </div>
 
-      <!-- Severity legend + Heatmap toggle -->
       <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
         <div class="flex gap-3 text-xs">
           <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>High</span>
           <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span>Med</span>
           <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-teal-500"></span>Low</span>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-gray-500">Heatmap</span>
-          <button onclick="toggleHeatmap(this)" id="heatmap-toggle"
-            class="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative transition-colors duration-200 cursor-pointer">
-            <span id="heatmap-knob" class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"></span>
-          </button>
-        </div>
+        <span class="text-xs font-semibold text-gray-500 dark:text-gray-400" id="view-mode-copy">Markers</span>
       </div>
 
-      <!-- Stats bar -->
       <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 grid grid-cols-3 gap-2 text-center">
-        <div><div class="text-lg font-extrabold text-gray-900 dark:text-white" id="sidebar-total">—</div><div class="text-[10px] text-gray-400">Shown</div></div>
-        <div><div class="text-lg font-extrabold text-rose-500" id="sidebar-high">—</div><div class="text-[10px] text-gray-400">High</div></div>
-        <div><div class="text-lg font-extrabold text-teal-500" id="sidebar-resolved">—</div><div class="text-[10px] text-gray-400">Resolved</div></div>
+        <div><div class="text-lg font-extrabold text-gray-900 dark:text-white" id="sidebar-total">-</div><div class="text-[10px] text-gray-400">Shown</div></div>
+        <div><div class="text-lg font-extrabold text-rose-500" id="sidebar-high">-</div><div class="text-[10px] text-gray-400">High</div></div>
+        <div><div class="text-lg font-extrabold text-teal-500" id="sidebar-resolved">-</div><div class="text-[10px] text-gray-400">Resolved</div></div>
       </div>
 
-      <!-- Issue list -->
       <div class="flex-1 overflow-y-auto" id="map-issue-list"></div>
     </div>
 
-    <!-- ── MAP AREA ── -->
     <div class="flex-1 relative" id="map-view">
-
-      <!-- Map canvas -->
-      <div id="map-canvas" class="w-full h-full map-bg-light relative overflow-hidden">
-
-        <!-- SVG roads/layout -->
-        <svg id="map-svg" class="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="map-grid" width="50" height="50" patternUnits="userSpaceOnUse">
-              <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(148,163,184,0.2)" stroke-width="0.5"/>
-            </pattern>
-            <!-- Heatmap radial gradients -->
-            <radialGradient id="heat-red" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.6"/>
-              <stop offset="100%" stop-color="#f43f5e" stop-opacity="0"/>
-            </radialGradient>
-            <radialGradient id="heat-orange" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#fb923c" stop-opacity="0.5"/>
-              <stop offset="100%" stop-color="#fb923c" stop-opacity="0"/>
-            </radialGradient>
-            <radialGradient id="heat-yellow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#facc15" stop-opacity="0.4"/>
-              <stop offset="100%" stop-color="#facc15" stop-opacity="0"/>
-            </radialGradient>
-          </defs>
-
-          <rect width="100%" height="100%" fill="url(#map-grid)"/>
-
-          <!-- Roads -->
-          <g class="roads">
-            <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#94a3b8" stroke-width="4" opacity="0.5" class="road"/>
-            <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#94a3b8" stroke-width="4" opacity="0.5" class="road"/>
-            <line x1="0" y1="30%" x2="100%" y2="68%" stroke="#cbd5e1" stroke-width="2.5" opacity="0.6" class="road"/>
-            <line x1="0" y1="70%" x2="100%" y2="32%" stroke="#cbd5e1" stroke-width="2.5" opacity="0.6" class="road"/>
-            <line x1="20%" y1="0" x2="22%" y2="100%" stroke="#e2e8f0" stroke-width="2" opacity="0.5" class="road"/>
-            <line x1="78%" y1="0" x2="80%" y2="100%" stroke="#e2e8f0" stroke-width="2" opacity="0.5" class="road"/>
-            <line x1="0" y1="18%" x2="100%" y2="20%" stroke="#e2e8f0" stroke-width="2" opacity="0.5" class="road"/>
-            <line x1="0" y1="80%" x2="100%" y2="82%" stroke="#e2e8f0" stroke-width="2" opacity="0.5" class="road"/>
-            <!-- Inner roads -->
-            <line x1="35%" y1="0" x2="37%" y2="100%" stroke="#e2e8f0" stroke-width="1.5" opacity="0.4"/>
-            <line x1="62%" y1="0" x2="64%" y2="100%" stroke="#e2e8f0" stroke-width="1.5" opacity="0.4"/>
-            <line x1="0" y1="42%" x2="100%" y2="42%" stroke="#e2e8f0" stroke-width="1.5" opacity="0.4"/>
-            <line x1="0" y1="60%" x2="100%" y2="60%" stroke="#e2e8f0" stroke-width="1.5" opacity="0.4"/>
-          </g>
-
-          <!-- City blocks -->
-          <g opacity="0.25">
-            <rect x="23%" y="22%" width="26%" height="18%" rx="4" fill="#c7d2fe"/>
-            <rect x="53%" y="22%" width="24%" height="17%" rx="4" fill="#c7d2fe"/>
-            <rect x="23%" y="54%" width="22%" height="18%" rx="4" fill="#c7d2fe"/>
-            <rect x="53%" y="54%" width="26%" height="20%" rx="4" fill="#c7d2fe"/>
-            <rect x="23%" y="43%" width="12%" height="9%" rx="3" fill="#a5f3fc"/>
-            <rect x="63%" y="43%" width="14%" height="9%" rx="3" fill="#a5f3fc"/>
-          </g>
-
-          <!-- Water -->
-          <ellipse cx="75%" cy="22%" rx="7%" ry="4%" fill="#bfdbfe" opacity="0.55"/>
-          <rect x="8%" y="60%" width="12%" height="6%" rx="5" fill="#bfdbfe" opacity="0.5"/>
-
-          <!-- Park -->
-          <ellipse cx="50%" cy="50%" rx="4%" ry="3%" fill="#bbf7d0" opacity="0.6"/>
-
-          <!-- Heatmap blobs (shown when heatmap on) -->
-          <g id="heat-blobs" display="none">
-            <ellipse cx="40%" cy="45%" rx="8%" ry="6%" fill="url(#heat-red)" opacity="0.7"/>
-            <ellipse cx="62%" cy="22%" rx="7%" ry="5%" fill="url(#heat-orange)" opacity="0.7"/>
-            <ellipse cx="60%" cy="62%" rx="6%" ry="5%" fill="url(#heat-yellow)" opacity="0.6"/>
-            <ellipse cx="22%" cy="62%" rx="5%" ry="4%" fill="url(#heat-orange)" opacity="0.5"/>
-          </g>
-        </svg>
-
-        <!-- Area labels -->
-        <div class="absolute inset-0 pointer-events-none select-none" id="area-labels">
-          <div class="absolute text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wide" style="top:28%;left:25%">Koramangala</div>
-          <div class="absolute text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wide" style="top:18%;left:55%">Indiranagar</div>
-          <div class="absolute text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wide" style="top:58%;left:55%">HSR Layout</div>
-          <div class="absolute text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wide" style="top:58%;left:23%">JP Nagar</div>
-          <div class="absolute text-xs font-bold text-violet-500 dark:text-violet-400 tracking-wide" style="top:47%;left:46%">CBD</div>
-          <div class="absolute text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wide" style="top:8%;right:8%">Whitefield</div>
-          <div class="absolute text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wide" style="bottom:12%;left:45%">Electronic City</div>
-          <div class="absolute text-xs font-bold text-gray-400 dark:text-gray-500 tracking-wide" style="top:20%;left:8%">Rajajinagar</div>
-        </div>
-
-        <!-- Markers container -->
-        <div id="map-markers" class="absolute inset-0"></div>
-
-        <!-- User location marker -->
-        <div id="user-location-marker" class="user-marker hidden" style="left:50%;top:50%">
-          <div class="relative flex items-center justify-center">
-            <div class="user-ring"></div>
-            <div class="user-dot"></div>
-          </div>
-        </div>
-
-        <!-- Radius circle around user -->
-        <div id="user-radius" class="hidden absolute" style="pointer-events:none"></div>
+      <div id="map-canvas" class="w-full h-full relative overflow-hidden">
+        <div id="leaflet-map" class="w-full h-full"></div>
       </div>
 
-      <!-- ── MOBILE TOP CONTROLS ── -->
-      <div class="absolute top-3 left-3 right-3 z-30 md:hidden flex gap-2">
-        <div class="relative flex-1">
+      <div class="absolute top-3 left-3 right-16 z-30 md:hidden">
+        <div class="relative">
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-          <input type="text" id="mobile-location-search" placeholder="Search location…"
-            class="form-input pl-9 shadow-xl bg-white/95 dark:bg-gray-900/95 backdrop-blur text-sm pr-10"
-            oninput="handleLocationSearch(this.value,'mobile')"
-            onkeydown="if(event.key==='Enter')searchLocation()"/>
+          <input type="text" id="mobile-location-search" placeholder="Search location..." class="form-input pl-9 shadow-xl bg-white/95 dark:bg-gray-900/95 backdrop-blur text-sm pr-10" oninput="handleLocationSearch(this.value,'mobile')" onkeydown="if(event.key==='Enter')searchLocation()"/>
           <button onclick="detectMyLocation()" class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg" style="background:linear-gradient(135deg,#8b5cf6,#14b8a6)">
             <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
           </button>
         </div>
-        <button onclick="toggleMobileSidebar()" class="bg-white/95 dark:bg-gray-900/95 backdrop-blur rounded-xl p-3 shadow-xl border border-gray-200 dark:border-gray-700">
+      </div>
+
+      <div id="mobile-location-dropdown" class="hidden absolute top-16 left-3 right-14 z-40 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden md:hidden max-h-48 overflow-y-auto"></div>
+      <div class="absolute top-3 right-3 z-30 flex flex-col gap-2">
+        <button onclick="toggleMobileSidebar()" class="md:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur rounded-xl p-3 shadow-xl border border-gray-200 dark:border-gray-700">
           <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+        </button>
+        <button onclick="toggleHeatmap()" id="heatmap-view-toggle" class="map-overlay-btn rounded-2xl px-4 py-3 text-sm font-semibold text-violet-700 dark:text-gray-100 transition-all hover:-translate-y-0.5">
+          Heatmap View
         </button>
       </div>
 
-      <!-- Mobile location dropdown -->
-      <div id="mobile-location-dropdown" class="hidden absolute top-16 left-3 right-14 z-40 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden md:hidden max-h-48 overflow-y-auto"></div>
-
-      <!-- ── POPUP ── -->
-      <div id="map-popup" class="hidden absolute z-40 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden" style="min-width:270px;max-width:310px">
-        <div id="popup-content"></div>
-        <button onclick="document.getElementById('map-popup').classList.add('hidden')"
-          class="absolute top-2 right-2 w-6 h-6 bg-black/20 rounded-full flex items-center justify-center text-white hover:bg-black/40 transition-colors text-xs">✕</button>
-      </div>
-
-      <!-- ── BOTTOM CONTROLS ── -->
       <div class="absolute bottom-6 right-4 z-30 flex flex-col gap-2">
-        <!-- Report here -->
         <a href="report.html" class="flex items-center gap-2 text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-xl transition-all hover:-translate-y-0.5" style="background:linear-gradient(135deg,#8b5cf6,#14b8a6)">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
           Report Here
         </a>
-        <!-- Map style toggle -->
         <button onclick="toggleMapStyle()" id="map-style-btn" class="bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-semibold px-3 py-2.5 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 transition-all flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
           Dark Map
         </button>
-        <!-- Zoom controls -->
         <div class="flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           <button onclick="zoomMap(1.15)" class="p-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 font-bold text-sm transition-colors">+</button>
           <div class="h-px bg-gray-200 dark:bg-gray-700"></div>
-          <button onclick="zoomMap(0.87)" class="p-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 font-bold text-sm transition-colors">−</button>
+          <button onclick="zoomMap(0.87)" class="p-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 font-bold text-sm transition-colors">-</button>
         </div>
       </div>
 
-      <!-- ── NEARBY ISSUES TOAST (auto, when location detected) ── -->
-      <div id="nearby-toast" class="hidden absolute bottom-6 left-4 z-30 max-w-xs bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-violet-200 dark:border-violet-700 p-4 scale-in">
+      <div id="nearby-toast" class="hidden absolute bottom-6 left-4 z-30 max-w-xs bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-violet-200 dark:border-violet-700 p-4">
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm" style="background:linear-gradient(135deg,#8b5cf6,#14b8a6)">📍</div>
+          <div class="w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm" style="background:linear-gradient(135deg,#8b5cf6,#14b8a6)">+</div>
           <div>
             <p class="text-xs font-bold text-gray-900 dark:text-white" id="nearby-toast-title">Issues near you</p>
             <p class="text-xs text-gray-500" id="nearby-toast-sub"></p>
           </div>
-          <button onclick="document.getElementById('nearby-toast').classList.add('hidden')" class="ml-auto text-gray-400 hover:text-gray-600 text-xs">✕</button>
+          <button onclick="document.getElementById('nearby-toast').classList.add('hidden')" class="ml-auto text-gray-400 hover:text-gray-600 text-xs">x</button>
         </div>
         <div id="nearby-toast-list" class="space-y-1"></div>
       </div>
     </div>
   </div>
 
-  <!-- Mobile sidebar drawer -->
   <div id="mobile-sidebar" class="md:hidden fixed inset-0 z-50 hidden">
     <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="toggleMobileSidebar()"></div>
     <div class="absolute left-0 top-0 bottom-0 w-80 bg-white dark:bg-gray-900 shadow-2xl overflow-y-auto" style="padding-top:64px">
       <div class="p-4">
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-bold text-gray-900 dark:text-white">Issues</h3>
-          <button onclick="toggleMobileSidebar()" class="text-gray-400 hover:text-gray-600">✕</button>
+          <button onclick="toggleMobileSidebar()" class="text-gray-400 hover:text-gray-600">x</button>
         </div>
         <div id="mobile-issue-list" class="space-y-1"></div>
       </div>
@@ -343,488 +182,613 @@
 
   <div id="bottom-nav" class="bottom-nav md:hidden"></div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
   <script src="js/api.js"></script>
   <script src="js/data.js"></script>
   <script src="js/components.js"></script>
   <script>
-  // ── STATE ──────────────────────────────────────────────────────────────
-  let heatmapOn=false, darkMapOn=false;
-  let issueSearch='', catFilter='all';
-  let userMapPos={x:null,y:null,label:null};
-  let mapZoom=1, mapPanX=0, mapPanY=0;
-  let locSearchTimer=null;
+    let heatmapOn=false;
+    let darkMapOn=false;
+    let issueSearch='';
+    let catFilter='all';
+    let locSearchTimer=null;
+    let leafletMap=null;
+    let baseTileLayer=null;
+    let darkTileLayer=null;
+    let markerLayerGroup=null;
+    let heatLayer=null;
+    let areaZoneLayerGroup=null;
+    let userMarkerLayer=null;
+    let userRadiusLayer=null;
+    let liveRefreshTimer=null;
+    let activePopupIssueId=null;
+    let userMapPos={lat:null,lng:null,label:null};
+    const markersByIssueId=new Map();
 
-  function getPinColor(score){
-    if(score>=80) return{fill:'#f43f5e',glow:'rgba(244,63,94,0.4)'};
-    if(score>=60) return{fill:'#fb923c',glow:'rgba(251,146,60,0.4)'};
-    if(score>=40) return{fill:'#eab308',glow:'rgba(234,179,8,0.4)'};
-    return{fill:'#14b8a6',glow:'rgba(20,184,166,0.4)'};
-  }
-
-  // Render markers from live issue and category data.
-  function getCatIcon(cat){
-    return getCategoryInfo(cat).icon || '!';
-  }
-
-  function hashString(value){
-    return Array.from(String(value || '')).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  }
-
-  function getIssuePosition(issue){
-    const numericIssues=ISSUES.filter((item)=>Number.isFinite(Number(item.lat))&&Number.isFinite(Number(item.lng)));
-    const lats=numericIssues.map((item)=>Number(item.lat));
-    const lngs=numericIssues.map((item)=>Number(item.lng));
-    if(Number.isFinite(Number(issue.lat))&&Number.isFinite(Number(issue.lng))&&lats.length&&lngs.length){
-      const minLat=Math.min(...lats), maxLat=Math.max(...lats);
-      const minLng=Math.min(...lngs), maxLng=Math.max(...lngs);
-      const latSpan=Math.max(maxLat-minLat,0.02);
-      const lngSpan=Math.max(maxLng-minLng,0.02);
-      const x=12+((Number(issue.lng)-minLng)/lngSpan)*76;
-      const y=88-((Number(issue.lat)-minLat)/latSpan)*76;
-      return { x: Math.max(8, Math.min(92, x)), y: Math.max(8, Math.min(92, y)) };
+    function escapeHtml(value=''){
+      return String(value)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
     }
-    const seed=hashString(issue.id || issue.title);
-    return { x: 15 + (seed % 70), y: 18 + ((seed * 7) % 60) };
-  }
 
-  function getAreaPosition(area){
-    const areaIssues=ISSUES.filter((issue)=>String(issue.area || issue.location || '').toLowerCase().includes(String(area || '').toLowerCase()));
-    if(areaIssues.length){
-      const positions=areaIssues.map(getIssuePosition);
-      return {
-        x: positions.reduce((sum, pos)=>sum+pos.x,0)/positions.length,
-        y: positions.reduce((sum, pos)=>sum+pos.y,0)/positions.length
-      };
+    function getPinColor(score){
+      if(score>=80) return { fill:'#ef4444' };
+      if(score>=60) return { fill:'#f97316' };
+      if(score>=40) return { fill:'#eab308' };
+      return { fill:'#14b8a6' };
     }
-    return null;
-  }
 
-  function getFilteredIssues(){
-    const q=issueSearch.toLowerCase();
-    return ISSUES.filter(i=>{
-      const matchSearch=!q||i.title.toLowerCase().includes(q)||i.location.toLowerCase().includes(q)||i.category.toLowerCase().includes(q);
-      const matchCat=catFilter==='all'||i.category===catFilter;
-      return matchSearch&&matchCat;
-    });
-  }
+    function getIssueLatLng(issue){
+      const lat=Number(issue?.lat ?? issue?.location?.lat);
+      const lng=Number(issue?.lng ?? issue?.location?.lng);
+      if(!Number.isFinite(lat)||!Number.isFinite(lng)) return null;
+      return [lat,lng];
+    }
 
-  function renderMarkers(){
-    const filtered=getFilteredIssues();
-    const container=document.getElementById('map-markers');
-    container.innerHTML=filtered.map(issue=>{
-      const pos=getIssuePosition(issue);
-      const c=getPinColor(issue.heatScore);
-      const size=heatmapOn?Math.max(24,Math.min(44,issue.heatScore/2.5)):28;
-      const isHigh=issue.heatScore>=80;
+    function getCatIcon(categoryId){
+      return getCategoryInfo(categoryId).icon || '!';
+    }
+
+    function initializeLeafletMap(){
+      if(leafletMap) return;
+      leafletMap=L.map('leaflet-map',{zoomControl:false,preferCanvas:true}).setView([12.9716,77.5946],12);
+      baseTileLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        maxZoom:19,
+        attribution:'&copy; OpenStreetMap contributors'
+      }).addTo(leafletMap);
+      darkTileLayer=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+        maxZoom:19,
+        attribution:'&copy; OpenStreetMap contributors &copy; CARTO'
+      });
+      markerLayerGroup=L.layerGroup().addTo(leafletMap);
+      areaZoneLayerGroup=L.layerGroup().addTo(leafletMap);
+      leafletMap.on('popupopen',(event)=>{
+        const id=Number(event.popup.options.issueId);
+        if(Number.isFinite(id)){
+          activePopupIssueId=id;
+          highlightIssueListItem(id);
+        }
+      });
+      leafletMap.on('popupclose',()=>{
+        activePopupIssueId=null;
+        highlightIssueListItem(null);
+      });
+      window.addEventListener('resize',()=>leafletMap.invalidateSize());
+    }
+
+    function getFilteredIssues(){
+      const q=issueSearch.toLowerCase();
+      return ISSUES.filter((issue)=>{
+        const latLng=getIssueLatLng(issue);
+        if(!latLng) return false;
+        const matchSearch=!q||issue.title.toLowerCase().includes(q)||issue.location.toLowerCase().includes(q)||issue.category.toLowerCase().includes(q);
+        const matchCategory=catFilter==='all'||issue.category===catFilter;
+        return matchSearch&&matchCategory;
+      });
+    }
+    function getIssuePopupHtml(issue){
+      const status=STATUSES[issue.status]||{label:issue.status,color:'bg-slate-100 text-slate-700'};
+      const category=getCategoryInfo(issue.category);
+      const color=getPinColor(issue.heatScore).fill;
       return `
-        <div class="marker-pin" style="left:${pos.x}%;top:${pos.y}%;${heatmapOn?`filter:drop-shadow(0 0 ${size/3}px ${c.glow});`:''}"
-             onclick="showPopup(${issue.id},${pos.x},${pos.y})" title="${issue.title}">
-          <div class="marker-tooltip">${issue.title.substring(0,28)}…</div>
-          <svg width="${size}" height="${size*1.3}" viewBox="0 0 28 36">
-            <path d="M14 0C6.27 0 0 6.27 0 14c0 9.75 14 22 14 22S28 23.75 28 14C28 6.27 21.73 0 14 0z" fill="${c.fill}" ${isHigh?`style="animation:heat-pulse 1.5s infinite"`:''}/> 
-            <circle cx="14" cy="14" r="6" fill="white" opacity="0.9"/>
-            <text x="14" y="18" text-anchor="middle" font-size="8">${getCatIcon(issue.category)}</text>
-          </svg>
-          <div class="pin-pulse" style="background:${c.fill}"></div>
-          ${isHigh?`<div class="cluster-badge">${issue.heatScore}</div>`:''}
-        </div>`;
-    }).join('');
-    renderHeatmapBlobs(filtered);
-    updateSidebarStats(filtered);
-    renderIssueList(filtered);
-  }
-
-  function renderHeatmapBlobs(filtered){
-    const heatLayer=document.getElementById('heat-blobs');
-    if(!heatLayer) return;
-    if(!heatmapOn || !filtered.length){
-      heatLayer.innerHTML='';
-      heatLayer.setAttribute('display','none');
-      return;
-    }
-    heatLayer.innerHTML=filtered.map(issue=>{
-      const pos=getIssuePosition(issue);
-      const score=Math.max(20, Number(issue.heatScore || 0));
-      const gradient=score>=80?'url(#heat-red)':score>=60?'url(#heat-orange)':'url(#heat-yellow)';
-      const rx=(score>=80?9:score>=60?7:5) + Math.min(7, score / 18);
-      const ry=(score>=80?6:score>=60?5:4) + Math.min(5, score / 24);
-      const opacity=score>=80?0.82:score>=60?0.68:0.52;
-      return `<ellipse cx="${pos.x}%" cy="${pos.y}%" rx="${rx}%" ry="${ry}%" fill="${gradient}" opacity="${opacity}"></ellipse>`;
-    }).join('');
-    heatLayer.setAttribute('display','block');
-  }
-
-  function updateSidebarStats(filtered){
-    document.getElementById('sidebar-total').textContent=filtered.length;
-    document.getElementById('sidebar-high').textContent=filtered.filter(i=>i.heatScore>=75).length;
-    document.getElementById('sidebar-resolved').textContent=filtered.filter(i=>i.status==='resolved').length;
-  }
-
-  // ── ISSUE LIST ────────────────────────────────────────────────────────
-  function renderIssueList(filtered){
-    const sorted=[...filtered].sort((a,b)=>b.heatScore-a.heatScore);
-    const html=sorted.map(issue=>{
-      const c=getPinColor(issue.heatScore);
-      const pos=getIssuePosition(issue);
-      const dist=userMapPos.x!=null?calcDist(pos.x,pos.y,userMapPos.x,userMapPos.y):null;
-      return `
-        <div class="issue-list-item px-4 py-3 border-b border-gray-100 dark:border-gray-800"
-             data-list-id="${issue.id}" onclick="showPopup(${issue.id},${pos.x},${pos.y})">
-          <div class="flex items-start gap-2">
-            <div class="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style="background:${c.fill}"></div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1">${issue.title}</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">${issue.location}</p>
-              <div class="flex items-center gap-2 mt-1 flex-wrap">
-                <span class="text-xs font-bold" style="color:${c.fill}">🔥${issue.heatScore}</span>
-                <span class="text-xs text-gray-400">·</span>
-                <span class="text-xs text-gray-400">${issue.daysOpen}d</span>
-                <span class="text-xs">${getCatIcon(issue.category)} ${issue.category}</span>
-                ${dist!=null?`<span class="text-[10px] text-violet-600 font-semibold ml-auto">${dist.toFixed(1)}km</span>`:''}
+        <div class="overflow-hidden rounded-[18px]">
+          <div class="p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-sm font-bold text-slate-900">${escapeHtml(issue.title)}</p>
+                <p class="mt-1 text-xs text-slate-500">${escapeHtml(issue.location)}</p>
               </div>
+              <span class="rounded-full px-2 py-1 text-[11px] font-bold" style="background:${color}22;color:${color}">Heat ${issue.heatScore}</span>
+            </div>
+            <div class="mt-3 flex items-center gap-2 text-[11px] text-slate-500">
+              <span class="rounded-full px-2 py-1 ${status.color}">${escapeHtml(status.label)}</span>
+              <span>${category.icon} ${escapeHtml(category.label)}</span>
+            </div>
+            <div class="mt-3">
+              <a href="issue.html?id=${issue.id}" class="inline-flex items-center rounded-xl bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100">Open details</a>
             </div>
           </div>
         </div>`;
-    }).join('');
-    document.getElementById('map-issue-list').innerHTML=html||'<div class="p-4 text-center text-sm text-gray-400">No issues match filters</div>';
-    // Mobile list
-    const mobileEl=document.getElementById('mobile-issue-list');
-    if(mobileEl) mobileEl.innerHTML=html;
-  }
+    }
 
-  // ── POPUP ─────────────────────────────────────────────────────────────
-  function showPopup(id,px,py){
-    const issue=ISSUES.find(i=>i.id===id);if(!issue)return;
-    const heat=getHeatColor(issue.heatScore);
-    const status=STATUSES[issue.status]||{label:issue.status,color:'',dot:''};
-    const c=getPinColor(issue.heatScore);
-    document.getElementById('popup-content').innerHTML=`
-      <div class="relative">
-        <img src="${issue.image}" alt="${issue.title}" class="w-full h-28 object-cover"
-             onerror="this.src='https://images.unsplash.com/photo-1486325212027-8081e485255e?w=400&q=60'"/>
-        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-        <div class="absolute bottom-2 left-2 right-8">
-          <span class="flex items-center gap-1 bg-white/90 backdrop-blur text-xs font-semibold px-2 py-0.5 rounded-full ${status.color} w-fit">
-            <span class="w-1.5 h-1.5 rounded-full ${status.dot}"></span>${status.label}
-          </span>
-        </div>
-        <div class="absolute top-2 left-2 w-6 h-6 flex items-center justify-center rounded-full text-xs"
-             style="background:${c.fill};color:white;box-shadow:0 2px 8px ${c.glow}">
-          ${getCatIcon(issue.category)}
-        </div>
-      </div>
-      <div class="p-3">
-        <h3 class="font-bold text-sm text-gray-900 dark:text-white leading-tight mb-1 line-clamp-2">${issue.title}</h3>
-        <div class="flex items-center gap-1 text-xs text-gray-500 mb-3">
-          <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-          ${issue.location}
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:${c.fill}22;color:${c.fill}">🔥${issue.heatScore}</span>
-          <div class="flex items-center gap-1 text-xs text-gray-500">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
-            ${issue.upvotes}
+    function getMarkerIcon(issue){
+      const color=getPinColor(issue.heatScore).fill;
+      const highClass=issue.heatScore>=80?'is-high':'';
+      return L.divIcon({
+        className:'',
+        html:`<div class="issue-marker ${highClass}" style="background:${color}"></div>`,
+        iconSize:[18,18],
+        iconAnchor:[9,9],
+        popupAnchor:[0,-8]
+      });
+    }
+
+    function highlightIssueListItem(id){
+      document.querySelectorAll('.issue-list-item').forEach((el)=>el.classList.remove('active'));
+      if(id!=null){
+        document.querySelector(`[data-list-id="${id}"]`)?.classList.add('active');
+      }
+    }
+
+    function getSeverityBand(issueCount){
+      if(issueCount>=5){
+        return {
+          label:'Severe',
+          color:'#ef4444',
+          fill:'rgba(239,68,68,0.22)',
+          ring:1400
+        };
+      }
+      if(issueCount>=3){
+        return {
+          label:'Moderate',
+          color:'#eab308',
+          fill:'rgba(234,179,8,0.22)',
+          ring:1050
+        };
+      }
+      return {
+        label:'Low',
+        color:'#22c55e',
+        fill:'rgba(34,197,94,0.2)',
+        ring:760
+      };
+    }
+
+    function buildAreaHeatGroups(issues){
+      const grouped=new Map();
+      issues.forEach((issue)=>{
+        const latLng=getIssueLatLng(issue);
+        if(!latLng) return;
+        const key=(issue.area||issue.location||`issue-${issue.id}`).trim();
+        if(!grouped.has(key)){
+          grouped.set(key,{
+            key,
+            label:issue.area||issue.location||'Unknown area',
+            latTotal:0,
+            lngTotal:0,
+            issueCount:0,
+            scoreTotal:0,
+            topScore:0
+          });
+        }
+        const bucket=grouped.get(key);
+        bucket.latTotal+=latLng[0];
+        bucket.lngTotal+=latLng[1];
+        bucket.issueCount+=1;
+        bucket.scoreTotal+=Number(issue.heatScore||0);
+        bucket.topScore=Math.max(bucket.topScore,Number(issue.heatScore||0));
+      });
+
+      return [...grouped.values()].map((group)=>{
+        const avgScore=Math.round(group.scoreTotal/group.issueCount);
+        return {
+          ...group,
+          lat:group.latTotal/group.issueCount,
+          lng:group.lngTotal/group.issueCount,
+          heatScore:avgScore,
+          densityScore:Math.min(100,group.issueCount*20)
+        };
+      }).sort((a,b)=>b.heatScore-a.heatScore);
+    }
+
+    function renderAreaSeverityZones(issues){
+      areaZoneLayerGroup.clearLayers();
+      const areaGroups=buildAreaHeatGroups(issues);
+
+      areaGroups.forEach((area)=>{
+        const severity=getSeverityBand(area.issueCount);
+        L.circle([area.lat,area.lng],{
+          radius:severity.ring + (area.issueCount-1)*120,
+          color:severity.color,
+          weight:2,
+          fillColor:severity.color,
+          fillOpacity:0.18
+        }).addTo(areaZoneLayerGroup);
+
+        const labelHtml=`
+          <div style="min-width:112px;border:1px solid ${severity.color};background:rgba(255,255,255,0.95);color:#0f172a;border-radius:14px;padding:8px 10px;box-shadow:0 10px 28px rgba(15,23,42,0.18);text-align:center;">
+            <div style="font-size:11px;font-weight:800;color:${severity.color};text-transform:uppercase;letter-spacing:0.04em;">${severity.label}</div>
+            <div style="font-size:12px;font-weight:700;line-height:1.2;margin-top:2px;">${escapeHtml(area.label)}</div>
+            <div style="font-size:11px;font-weight:700;margin-top:3px;">${area.issueCount} issue${area.issueCount===1?'':'s'} nearby</div>
+          </div>`;
+
+        const labelMarker=L.marker([area.lat,area.lng],{
+          icon:L.divIcon({
+            className:'',
+            html:labelHtml,
+            iconSize:[120,58],
+            iconAnchor:[60,29]
+          })
+        });
+
+        labelMarker.bindPopup(`
+          <div class="p-3">
+            <p class="text-sm font-bold text-slate-900">${escapeHtml(area.label)}</p>
+            <p class="mt-1 text-xs text-slate-500">${severity.label} concentration area</p>
+            <div class="mt-3 flex items-center gap-2 text-xs">
+              <span class="rounded-full px-2 py-1 font-bold" style="background:${severity.fill};color:${severity.color}">${area.issueCount} issue${area.issueCount===1?'':'s'}</span>
+              <span class="text-slate-500">Avg heat ${area.heatScore}</span>
+            </div>
           </div>
-          <a href="issue.html?id=${issue.id}" class="text-xs text-violet-600 dark:text-violet-400 font-semibold hover:underline px-2 py-1 bg-violet-50 dark:bg-violet-900/20 rounded-lg">View →</a>
-        </div>
-      </div>`;
+        `);
+        labelMarker.addTo(areaZoneLayerGroup);
+      });
+    }
 
-    // Position popup smartly
-    const mapRect=document.getElementById('map-canvas').getBoundingClientRect();
-    let left=(px/100)*mapRect.width+20;
-    let top=(py/100)*mapRect.height-40;
-    if(left+310>mapRect.width) left=(px/100)*mapRect.width-330;
-    if(top<10) top=10;
-    if(top+200>mapRect.height) top=mapRect.height-210;
-    const popup=document.getElementById('map-popup');
-    popup.style.left=Math.max(8,left)+'px';
-    popup.style.top=Math.max(8,top)+'px';
-    popup.classList.remove('hidden');
-    popup.classList.add('scale-in');
-    setTimeout(()=>popup.classList.remove('scale-in'),400);
+    function renderMapVisualization(){
+      const filtered=getFilteredIssues();
+      markerLayerGroup.clearLayers();
+      markersByIssueId.clear();
+      areaZoneLayerGroup.clearLayers();
+      if(heatLayer){
+        leafletMap.removeLayer(heatLayer);
+        heatLayer=null;
+      }
 
-    // Highlight list item
-    document.querySelectorAll('.issue-list-item').forEach(el=>el.classList.remove('active'));
-    document.querySelector(`[data-list-id="${id}"]`)?.classList.add('active');
-  }
+      if(heatmapOn&&filtered.length){
+        const heatPoints=filtered.map((issue)=>{
+          const latLng=getIssueLatLng(issue);
+          return [latLng[0],latLng[1],Math.max(0.05,Math.min(1,Number(issue.heatScore||0)/100))];
+        });
+        heatLayer=L.heatLayer(heatPoints,{
+          radius:38,
+          blur:18,
+          maxZoom:12,
+          minOpacity:0.35,
+          max:1,
+          gradient:{
+            0.25:'#22c55e',
+            0.55:'#eab308',
+            0.8:'#ef4444',
+            1.0:'#b91c1c'
+          }
+        }).addTo(leafletMap);
+        renderAreaSeverityZones(filtered);
+      }else{
+        filtered.forEach((issue)=>{
+          const latLng=getIssueLatLng(issue);
+          const marker=L.marker(latLng,{icon:getMarkerIcon(issue)});
+          marker.bindPopup(getIssuePopupHtml(issue),{issueId:issue.id});
+          marker.addTo(markerLayerGroup);
+          markersByIssueId.set(issue.id,marker);
+        });
+      }
 
-  // ── LOCATION SEARCH ───────────────────────────────────────────────────
-  function getAreaSuggestions(){
-    return [...new Set(ISSUES.map((issue)=>issue.area).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  }
+      updateSidebarStats(filtered);
+      renderIssueList(filtered);
+      document.getElementById('view-mode-copy').textContent=heatmapOn?'Heatmap':'Markers';
+    }
 
-  function handleLocationSearch(val,target='desktop'){
-    clearTimeout(locSearchTimer);
-    const dropId=target==='mobile'?'mobile-location-dropdown':'location-dropdown';
-    const drop=document.getElementById(dropId);
-    if(!val||val.length<2){drop.classList.add('hidden');return;}
-    locSearchTimer=setTimeout(()=>{
-      const matches=getAreaSuggestions().filter(a=>a.toLowerCase().includes(val.toLowerCase())).slice(0,6);
-      if(!matches.length){drop.classList.add('hidden');return;}
-      drop.innerHTML=matches.map(a=>`
-        <div class="location-search-result flex items-center gap-2 px-3 py-2 cursor-pointer"
-             onclick="selectLocation('${a}','${target}')">
-          <svg class="w-3.5 h-3.5 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-          <span class="text-sm text-gray-700 dark:text-gray-300">${a}</span>
+    function updateSidebarStats(filtered){
+      document.getElementById('sidebar-total').textContent=filtered.length;
+      document.getElementById('sidebar-high').textContent=filtered.filter((issue)=>issue.heatScore>=75).length;
+      document.getElementById('sidebar-resolved').textContent=filtered.filter((issue)=>issue.status==='resolved').length;
+    }
+
+    function calculateDistanceKm(lat1,lng1,lat2,lng2){
+      const toRad=(value)=>value*Math.PI/180;
+      const radiusKm=6371;
+      const dLat=toRad(lat2-lat1);
+      const dLng=toRad(lng2-lng1);
+      const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+      return radiusKm*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+    }
+
+    function renderIssueList(filtered){
+      const sorted=[...filtered].sort((a,b)=>b.heatScore-a.heatScore);
+      const html=sorted.map((issue)=>{
+        const color=getPinColor(issue.heatScore).fill;
+        const latLng=getIssueLatLng(issue);
+        const distance=userMapPos.lat!=null?calculateDistanceKm(latLng[0],latLng[1],userMapPos.lat,userMapPos.lng):null;
+        return `
+          <div class="issue-list-item px-4 py-3 border-b border-gray-100 dark:border-gray-800" data-list-id="${issue.id}" onclick="focusIssue(${issue.id})">
+            <div class="flex items-start gap-2">
+              <div class="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style="background:${color}"></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1">${escapeHtml(issue.title)}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">${escapeHtml(issue.location)}</p>
+                <div class="flex items-center gap-2 mt-1 flex-wrap">
+                  <span class="text-xs font-bold" style="color:${color}">Heat ${issue.heatScore}</span>
+                  <span class="text-xs text-gray-400">.</span>
+                  <span class="text-xs text-gray-400">${issue.daysOpen}d</span>
+                  <span class="text-xs">${getCatIcon(issue.category)} ${escapeHtml(getCategoryInfo(issue.category).label)}</span>
+                  ${distance!=null?`<span class="text-[10px] text-violet-600 font-semibold ml-auto">${distance.toFixed(1)}km</span>`:''}
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      const fallback='<div class="p-4 text-center text-sm text-gray-400">No issues match filters</div>';
+      document.getElementById('map-issue-list').innerHTML=html||fallback;
+      document.getElementById('mobile-issue-list').innerHTML=html||fallback;
+    }
+
+    function focusIssue(id){
+      const issue=ISSUES.find((item)=>item.id===id);
+      if(!issue||!leafletMap) return;
+      const latLng=getIssueLatLng(issue);
+      leafletMap.flyTo(latLng,Math.max(leafletMap.getZoom(),14),{duration:0.6});
+      if(markersByIssueId.has(id)){
+        markersByIssueId.get(id).openPopup();
+      }else{
+        activePopupIssueId=id;
+        highlightIssueListItem(id);
+        L.popup({issueId:id}).setLatLng(latLng).setContent(getIssuePopupHtml(issue)).openOn(leafletMap);
+      }
+      document.getElementById('mobile-sidebar').classList.add('hidden');
+    }
+
+    function showPopup(id){
+      focusIssue(id);
+    }
+
+    function getAreaSuggestions(){
+      return [...new Set(ISSUES.map((issue)=>issue.area).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    }
+    function handleLocationSearch(value,target='desktop'){
+      clearTimeout(locSearchTimer);
+      const dropId=target==='mobile'?'mobile-location-dropdown':'location-dropdown';
+      const drop=document.getElementById(dropId);
+      if(!value||value.length<2){
+        drop.classList.add('hidden');
+        return;
+      }
+      locSearchTimer=setTimeout(()=>{
+        const matches=getAreaSuggestions().filter((area)=>area.toLowerCase().includes(value.toLowerCase())).slice(0,6);
+        if(!matches.length){
+          drop.classList.add('hidden');
+          return;
+        }
+        drop.innerHTML=matches.map((area)=>`
+          <div class="location-search-result flex items-center gap-2 px-3 py-2 cursor-pointer" onclick="selectLocation('${area.replace(/'/g,"\\'")}','${target}')">
+            <svg class="w-3.5 h-3.5 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+            <span class="text-sm text-gray-700 dark:text-gray-300">${escapeHtml(area)}</span>
+          </div>`).join('');
+        drop.classList.remove('hidden');
+      },200);
+    }
+
+    function getAreaCenter(area){
+      const matches=ISSUES.filter((issue)=>{
+        const latLng=getIssueLatLng(issue);
+        return latLng&&String(issue.area||issue.location||'').toLowerCase().includes(String(area||'').toLowerCase());
+      });
+      if(!matches.length) return null;
+      const center=matches.reduce((acc,issue)=>{
+        const latLng=getIssueLatLng(issue);
+        acc.lat+=latLng[0];
+        acc.lng+=latLng[1];
+        return acc;
+      },{lat:0,lng:0});
+      return [center.lat/matches.length,center.lng/matches.length];
+    }
+
+    function selectLocation(area,target='desktop'){
+      const inputId=target==='mobile'?'mobile-location-search':'location-search';
+      const dropId=target==='mobile'?'mobile-location-dropdown':'location-dropdown';
+      document.getElementById(inputId).value=area;
+      document.getElementById('location-search').value=area;
+      const mobileInput=document.getElementById('mobile-location-search');
+      if(mobileInput) mobileInput.value=area;
+      document.getElementById(dropId).classList.add('hidden');
+      const center=getAreaCenter(area);
+      if(center){
+        leafletMap.flyTo(center,13,{duration:0.6});
+        moveUserMarker(center[0],center[1],area,false);
+      }else{
+        Toast.show(`Showing ${area} area`,'info',2000);
+      }
+    }
+
+    function searchLocation(){
+      const value=document.getElementById('location-search').value||document.getElementById('mobile-location-search').value||'';
+      if(value) selectLocation(value);
+    }
+
+    function moveUserMarker(lat,lng,label,realGPS=false){
+      userMapPos={lat,lng,label};
+      if(userMarkerLayer) leafletMap.removeLayer(userMarkerLayer);
+      if(userRadiusLayer) leafletMap.removeLayer(userRadiusLayer);
+      userMarkerLayer=L.circleMarker([lat,lng],{
+        radius:9,
+        color:'#ffffff',
+        weight:3,
+        fillColor:'#6366f1',
+        fillOpacity:1
+      }).addTo(leafletMap);
+      userRadiusLayer=L.circle([lat,lng],{
+        radius:700,
+        color:'#8b5cf6',
+        weight:1.5,
+        fillColor:'#8b5cf6',
+        fillOpacity:0.08
+      }).addTo(leafletMap);
+      document.getElementById('my-location-badge').classList.remove('hidden');
+      document.getElementById('my-location-text').textContent=`Location: ${label}${realGPS?' (GPS)':''}`;
+      document.getElementById('location-search').value=label;
+      const mobileInput=document.getElementById('mobile-location-search');
+      if(mobileInput) mobileInput.value=label;
+      renderMapVisualization();
+      if(realGPS) Toast.show('Live location detected','success',2200);
+    }
+
+    function clearMyLocation(){
+      userMapPos={lat:null,lng:null,label:null};
+      if(userMarkerLayer) leafletMap.removeLayer(userMarkerLayer);
+      if(userRadiusLayer) leafletMap.removeLayer(userRadiusLayer);
+      userMarkerLayer=null;
+      userRadiusLayer=null;
+      document.getElementById('my-location-badge').classList.add('hidden');
+      document.getElementById('location-search').value='';
+      const mobileInput=document.getElementById('mobile-location-search');
+      if(mobileInput) mobileInput.value='';
+      renderMapVisualization();
+    }
+
+    function showNearbyIssues(lat,lng){
+      const nearby=ISSUES.map((issue)=>{
+        const latLng=getIssueLatLng(issue);
+        if(!latLng) return null;
+        return { ...issue, distance:calculateDistanceKm(lat,lng,latLng[0],latLng[1]) };
+      }).filter(Boolean).filter((issue)=>issue.distance<5).sort((a,b)=>a.distance-b.distance).slice(0,4);
+      if(!nearby.length) return;
+      document.getElementById('nearby-toast-title').textContent=`${nearby.length} issues near you`;
+      document.getElementById('nearby-toast-sub').textContent='Within ~5km radius';
+      document.getElementById('nearby-toast-list').innerHTML=nearby.map((issue)=>`
+        <div class="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg p-1" onclick="focusIssue(${issue.id})">
+          <span class="font-bold" style="color:${getPinColor(issue.heatScore).fill}">${getCatIcon(issue.category)}</span>
+          <span class="flex-1 font-medium text-gray-700 dark:text-gray-300 line-clamp-1">${escapeHtml(issue.title.substring(0,30))}</span>
+          <span class="text-violet-600 font-semibold ml-auto">${issue.distance.toFixed(1)}km</span>
         </div>`).join('');
-      drop.classList.remove('hidden');
-    },200);
-  }
-
-  function selectLocation(area,target='desktop'){
-    const pos=getAreaPosition(area);
-    const inputId=target==='mobile'?'mobile-location-search':'location-search';
-    document.getElementById(inputId).value=area;
-    document.getElementById(target==='mobile'?'mobile-location-dropdown':'location-dropdown').classList.add('hidden');
-
-    if(pos){
-      moveUserMarker(pos.x,pos.y,area);
-    }else{
-      Toast.show(`Showing ${area} area`,'info',2000);
+      document.getElementById('nearby-toast').classList.remove('hidden');
     }
-  }
 
-  function searchLocation(){
-    const val=document.getElementById('location-search').value||document.getElementById('mobile-location-search')?.value||'';
-    if(!val)return;
-    selectLocation(val);
-  }
-
-  function detectMyLocation(){
-    const btn=document.getElementById('locate-btn');
-    btn.style.animation='spin 1s linear infinite';
-    btn.style.cssText+=';transition:none';
-    document.getElementById('my-location-badge')?.classList.remove('hidden');
-    document.getElementById('my-location-text').textContent='Detecting…';
-
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(
-        pos=>{
+    function detectMyLocation(){
+      const btn=document.getElementById('locate-btn');
+      btn.style.animation='spin 1s linear infinite';
+      if(navigator.geolocation){
+        navigator.geolocation.getCurrentPosition((pos)=>{
           btn.style.animation='';
-          // Map lat/lng to our fake map position
-          // Bangalore center ~12.97°N, 77.59°E
-          const lat=pos.coords.latitude, lng=pos.coords.longitude;
-          const mapX=50+(lng-77.59)*120; // rough linear mapping
-          const mapY=50-(lat-12.97)*120;
-          const clampedX=Math.max(5,Math.min(95,mapX));
-          const clampedY=Math.max(5,Math.min(95,mapY));
-          moveUserMarker(clampedX,clampedY,'Your Location',true);
-          // Save to app state
+          const lat=Number(pos.coords.latitude.toFixed(5));
+          const lng=Number(pos.coords.longitude.toFixed(5));
           saveLocation({lat,lng,label:'Your Location'});
-          document.getElementById('location-search').value='Your Location';
-          showNearbyIssues(clampedX,clampedY);
-        },
-        err=>{
+          moveUserMarker(lat,lng,'Your Location',true);
+          leafletMap.flyTo([lat,lng],Math.max(leafletMap.getZoom(),13),{duration:0.6});
+          showNearbyIssues(lat,lng);
+        },()=>{
           btn.style.animation='';
-          // Fallback to stored or simulate Bangalore center
-          const fallback={x:50,y:50};
-          moveUserMarker(fallback.x,fallback.y,'Bengaluru (approx)',false);
-          document.getElementById('location-search').value='Bengaluru (approx)';
-          Toast.show('Using approximate location','info',2000);
-        },{enableHighAccuracy:true,timeout:8000}
-      );
-    }else{
-      btn.style.animation='';
-      moveUserMarker(50,50,'Bengaluru',false);
-      Toast.show('Geolocation not supported','warning');
-    }
-  }
-
-  function moveUserMarker(x,y,label,realGPS=false){
-    userMapPos={x,y,label};
-    const marker=document.getElementById('user-location-marker');
-    marker.style.left=x+'%';
-    marker.style.top=y+'%';
-    marker.classList.remove('hidden');
-    // Show radius ring
-    showUserRadius(x,y);
-    document.getElementById('my-location-badge')?.classList.remove('hidden');
-    document.getElementById('my-location-text').textContent=`📍 ${label}${realGPS?' (GPS)':''}`;
-    document.getElementById('location-search').value=label;
-    renderMarkers(); // re-render to show distances
-    if(realGPS) Toast.show('Live location detected! 📍','success',2500);
-  }
-
-  function showUserRadius(cx,cy){
-    const el=document.getElementById('user-radius');
-    const r=80; // px radius circle visual
-    el.style.left=(cx-8)+'%';
-    el.style.top=(cy-8)+'%';
-    el.style.width='16%';
-    el.style.height='16%';
-    el.style.borderRadius='50%';
-    el.style.border='2px dashed rgba(139,92,246,0.4)';
-    el.style.background='radial-gradient(circle,rgba(139,92,246,0.05),transparent)';
-    el.classList.remove('hidden');
-  }
-
-  function clearMyLocation(){
-    userMapPos={x:null,y:null,label:null};
-    document.getElementById('user-location-marker').classList.add('hidden');
-    document.getElementById('user-radius').classList.add('hidden');
-    document.getElementById('my-location-badge').classList.add('hidden');
-    document.getElementById('location-search').value='';
-    renderMarkers();
-  }
-
-  function calcDist(x1,y1,x2,y2){
-    // Rough distance: 1% of map ≈ 0.3km
-    return Math.sqrt((x1-x2)**2+(y1-y2)**2)*0.3;
-  }
-
-  function showNearbyIssues(cx,cy){
-    const nearby=ISSUES.map(issue=>{
-      const pos=getIssuePosition(issue);
-      return{...issue,dist:calcDist(pos.x,pos.y,cx,cy)};
-    }).filter(i=>i.dist<5).sort((a,b)=>a.dist-b.dist).slice(0,4);
-
-    if(!nearby.length)return;
-    const toast=document.getElementById('nearby-toast');
-    document.getElementById('nearby-toast-title').textContent=`${nearby.length} issues near you`;
-    document.getElementById('nearby-toast-sub').textContent=`Within ~1.5km radius`;
-    document.getElementById('nearby-toast-list').innerHTML=nearby.map(i=>`
-      <div class="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg p-1"
-           onclick="showPopup(${i.id},${getIssuePosition(i).x},${getIssuePosition(i).y})">
-        <span class="font-bold" style="color:${getPinColor(i.heatScore).fill}">${getCatIcon(i.category)}</span>
-        <span class="flex-1 font-medium text-gray-700 dark:text-gray-300 line-clamp-1">${i.title.substring(0,30)}</span>
-        <span class="text-violet-600 font-semibold ml-auto">${i.dist.toFixed(1)}km</span>
-      </div>`).join('');
-    toast.classList.remove('hidden');
-  }
-
-  // ── FILTERS ───────────────────────────────────────────────────────────
-  function filterIssues(val){
-    issueSearch=val;
-    renderMarkers();
-    document.getElementById('map-popup').classList.add('hidden');
-  }
-
-  function setCatFilter(cat,btn){
-    catFilter=cat;
-    document.querySelectorAll('.cat-filter-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    renderMarkers();
-    document.getElementById('map-popup').classList.add('hidden');
-  }
-
-  function renderCategoryFilters(){
-    const container=document.getElementById('cat-filters');
-    if(!container) return;
-    container.innerHTML=[
-      `<button onclick="setCatFilter('all',this)" class="cat-filter-btn ${catFilter==='all'?'active':''} text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">All</button>`,
-      ...CATEGORIES.map((category)=>`<button onclick="setCatFilter('${category.id}',this)" class="cat-filter-btn ${catFilter===category.id?'active':''} text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">${category.icon} ${category.label}</button>`)
-    ].join('');
-  }
-
-  function toggleHeatmap(btn){
-    heatmapOn=!heatmapOn;
-    btn.style.background=heatmapOn?'linear-gradient(135deg,#8b5cf6,#14b8a6)':'';
-    btn.classList.toggle('bg-gray-200',!heatmapOn);
-    btn.classList.toggle('dark:bg-gray-700',!heatmapOn);
-    document.getElementById('heatmap-knob').style.transform=heatmapOn?'translateX(20px)':'translateX(0)';
-    document.getElementById('heatmap-knob').style.background=heatmapOn?'white':'white';
-    document.getElementById('heat-blobs').setAttribute('display',heatmapOn?'block':'none');
-    renderMarkers();
-    Toast.show(heatmapOn?'Heatmap view on 🔥':'Heatmap off','info',1500);
-  }
-
-  function toggleMapStyle(){
-    darkMapOn=!darkMapOn;
-    const canvas=document.getElementById('map-canvas');
-    canvas.classList.toggle('map-bg-light',!darkMapOn);
-    canvas.classList.toggle('map-bg-dark',darkMapOn);
-    // Road colors
-    document.querySelectorAll('.road').forEach(r=>{
-      r.setAttribute('stroke',darkMapOn?'#1e293b':'#94a3b8');
-    });
-    // City block opacity
-    document.querySelectorAll('#map-svg rect:not([fill*="url"]),#map-svg ellipse').forEach(el=>{
-      if(el.getAttribute('fill')==='#c7d2fe') el.setAttribute('fill',darkMapOn?'#1e293b':'#c7d2fe');
-      if(el.getAttribute('fill')==='#a5f3fc') el.setAttribute('fill',darkMapOn?'#0f2a2a':'#a5f3fc');
-      if(el.getAttribute('fill')==='#bfdbfe') el.setAttribute('fill',darkMapOn?'#0c1a2e':'#bfdbfe');
-      if(el.getAttribute('fill')==='#bbf7d0') el.setAttribute('fill',darkMapOn?'#0a1a0e':'#bbf7d0');
-    });
-    document.getElementById('map-style-btn').textContent=darkMapOn?'☀️ Light Map':'🌙 Dark Map';
-  }
-
-  function toggleMobileSidebar(){
-    document.getElementById('mobile-sidebar').classList.toggle('hidden');
-  }
-
-  // ── ZOOM (CSS transform based) ────────────────────────────────────────
-  function zoomMap(factor){
-    mapZoom=Math.max(0.6,Math.min(2.5,mapZoom*factor));
-    document.getElementById('map-markers').style.transform=`scale(${mapZoom})`;
-    document.getElementById('map-markers').style.transformOrigin='center center';
-  }
-
-  // ── AUTO-ANIMATE new issue pin ────────────────────────────────────────
-  function animateNewPin(x,y){
-    const el=document.createElement('div');
-    el.style.cssText=`position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-50%);pointer-events:none;z-index:50;`;
-    el.innerHTML=`<div style="width:40px;height:40px;border-radius:50%;border:3px solid #8b5cf6;animation:userPulse 0.8s ease-out 3 both;opacity:0.8"></div>`;
-    document.getElementById('map-markers').appendChild(el);
-    setTimeout(()=>el.remove(),2500);
-  }
-
-  // ── LIVE TICKER: new random issue every 30s (demo) ───────────────────
-  function startLiveTicker(){
-    setInterval(()=>{
-      const randomIssue=ISSUES[Math.floor(Math.random()*ISSUES.length)];
-      const pos=getIssuePosition(randomIssue);
-      // Flash existing marker
-      const marker=document.querySelector(`[onclick="showPopup(${randomIssue.id},${pos.x},${pos.y})"]`);
-      if(marker){
-        marker.style.transition='transform 0.2s';
-        marker.style.transform='translate(-50%,-100%) scale(1.8)';
-        setTimeout(()=>marker.style.transform='',300);
+          moveUserMarker(12.9716,77.5946,'Bengaluru (approx)',false);
+          Toast.show('Using approximate location','info',1800);
+        },{enableHighAccuracy:true,timeout:8000});
+      }else{
+        btn.style.animation='';
+        Toast.show('Geolocation not supported','warning');
       }
-    },30000);
-  }
-
-  // ── INIT ──────────────────────────────────────────────────────────────
-  document.addEventListener('DOMContentLoaded',async ()=>{
-    renderNavbar('map.html');
-    renderBottomNav('map.html');
-    try{
-      const [categories, issues] = await Promise.all([
-        window.CivicAPI.fetchCategories(),
-        window.CivicAPI.fetchIssues({ limit: 100, sort: 'heat' })
-      ]);
-      CATEGORIES.length=0;
-      CATEGORIES.push(...categories);
-      syncIssues(issues);
-    }catch(error){
-      Toast.show(error.message||'Could not load live map data','error');
-    }
-    renderCategoryFilters();
-    renderMarkers();
-    startLiveTicker();
-
-    // If location already stored, show it
-    if(userLocation){
-      const pos={x:50,y:50};
-      moveUserMarker(pos.x,pos.y,userLocation.label||'Saved Location');
     }
 
-    // Close popup on map click
-    document.getElementById('map-canvas').addEventListener('click',e=>{
-      if(!e.target.closest('.marker-pin') && !e.target.closest('#map-popup')){
-        document.getElementById('map-popup').classList.add('hidden');
-      }
-    });
+    function autoDetectMyLocation(){
+      if(!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition((pos)=>{
+        const lat=Number(pos.coords.latitude.toFixed(5));
+        const lng=Number(pos.coords.longitude.toFixed(5));
+        saveLocation({lat,lng,label:'Your Location'});
+        moveUserMarker(lat,lng,'Your Location',true);
+        leafletMap.flyTo([lat,lng],Math.max(leafletMap.getZoom(),13),{duration:0.6});
+        showNearbyIssues(lat,lng);
+      },()=>{
+        if(userLocation?.lat!=null&&userLocation?.lng!=null){
+          moveUserMarker(Number(userLocation.lat),Number(userLocation.lng),userLocation.label||'Saved Location',false);
+        }
+      },{enableHighAccuracy:true,timeout:8000});
+    }
+    function filterIssues(value){
+      issueSearch=value;
+      renderMapVisualization();
+      leafletMap.closePopup();
+    }
 
-    // Close location dropdown on outside click
-    document.addEventListener('click',e=>{
-      if(!e.target.closest('#location-search')&&!e.target.closest('#location-dropdown')){
-        document.getElementById('location-dropdown').classList.add('hidden');
+    function setCatFilter(category,button){
+      catFilter=category;
+      document.querySelectorAll('.cat-filter-btn').forEach((btn)=>btn.classList.remove('active'));
+      button.classList.add('active');
+      renderMapVisualization();
+      leafletMap.closePopup();
+    }
+
+    function renderCategoryFilters(){
+      const container=document.getElementById('cat-filters');
+      container.innerHTML=[
+        `<button onclick="setCatFilter('all',this)" class="cat-filter-btn ${catFilter==='all'?'active':''} text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">All</button>`,
+        ...CATEGORIES.map((category)=>`<button onclick="setCatFilter('${category.id}',this)" class="cat-filter-btn ${catFilter===category.id?'active':''} text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">${category.icon} ${escapeHtml(category.label)}</button>`)
+      ].join('');
+    }
+
+    function toggleHeatmap(){
+      heatmapOn=!heatmapOn;
+      const button=document.getElementById('heatmap-view-toggle');
+      button.textContent=heatmapOn?'Marker View':'Heatmap View';
+      button.classList.toggle('text-violet-700',!heatmapOn);
+      button.classList.toggle('text-white',heatmapOn);
+      button.style.background=heatmapOn?'linear-gradient(135deg,#8b5cf6,#14b8a6)':'';
+      renderMapVisualization();
+      Toast.show(heatmapOn?'Heatmap enabled':'Marker view enabled','info',1500);
+    }
+
+    function toggleMapStyle(){
+      darkMapOn=!darkMapOn;
+      if(darkMapOn){
+        if(leafletMap.hasLayer(baseTileLayer)) leafletMap.removeLayer(baseTileLayer);
+        darkTileLayer.addTo(leafletMap);
+      }else{
+        if(leafletMap.hasLayer(darkTileLayer)) leafletMap.removeLayer(darkTileLayer);
+        baseTileLayer.addTo(leafletMap);
       }
-      if(!e.target.closest('#mobile-location-search')&&!e.target.closest('#mobile-location-dropdown')){
-        document.getElementById('mobile-location-dropdown')?.classList.add('hidden');
+      document.getElementById('map-style-btn').textContent=darkMapOn?'Light Map':'Dark Map';
+    }
+
+    function zoomMap(factor){
+      if(!leafletMap) return;
+      if(factor>1) leafletMap.zoomIn();
+      else leafletMap.zoomOut();
+    }
+
+    function toggleMobileSidebar(){
+      document.getElementById('mobile-sidebar').classList.toggle('hidden');
+    }
+
+    async function refreshLiveMapData(silent=true){
+      try{
+        const issues=await window.CivicAPI.fetchIssues({ limit:100, sort:'heat' });
+        syncIssues(issues);
+        renderMapVisualization();
+        if(!silent) Toast.show('Map data refreshed','success',1600);
+      }catch(error){
+        if(!silent) Toast.show(error.message||'Could not refresh map data','error');
       }
+    }
+
+    function startLiveRefresh(){
+      if(liveRefreshTimer) clearInterval(liveRefreshTimer);
+      liveRefreshTimer=setInterval(()=>refreshLiveMapData(true),30000);
+    }
+
+    document.addEventListener('DOMContentLoaded',async ()=>{
+      renderNavbar('map.html');
+      renderBottomNav('map.html');
+      initializeLeafletMap();
+      try{
+        const [categories, issues] = await Promise.all([
+          window.CivicAPI.fetchCategories(),
+          window.CivicAPI.fetchIssues({ limit:100, sort:'heat' })
+        ]);
+        CATEGORIES.length=0;
+        CATEGORIES.push(...categories);
+        syncIssues(issues);
+      }catch(error){
+        Toast.show(error.message||'Could not load live map data','error');
+      }
+
+      renderCategoryFilters();
+      renderMapVisualization();
+      startLiveRefresh();
+
+      autoDetectMyLocation();
+
+      document.addEventListener('click',(event)=>{
+        if(!event.target.closest('#location-search')&&!event.target.closest('#location-dropdown')){
+          document.getElementById('location-dropdown').classList.add('hidden');
+        }
+        if(!event.target.closest('#mobile-location-search')&&!event.target.closest('#mobile-location-dropdown')){
+          document.getElementById('mobile-location-dropdown').classList.add('hidden');
+        }
+      });
     });
-  });
   </script>
 </body>
 </html>
-

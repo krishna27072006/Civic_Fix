@@ -88,7 +88,7 @@
           </span>
           Monthly Reports &amp; Resolutions
         </h3>
-        <span class="text-xs text-gray-400 dark:text-gray-500 font-medium">2024</span>
+        <span class="text-xs text-gray-400 dark:text-gray-500 font-medium" id="monthly-range-label">Live</span>
       </div>
       <div id="monthly-chart"></div>
     </div>
@@ -234,6 +234,7 @@ function initNearby(){
 
 function initPage(){
   const analytics = buildIssueAnalytics();
+  const monthlySeries = buildMonthlyReportSeries(ISSUES, 6);
   renderNavbar('index.html');
   renderBottomNav('index.html');
   CATEGORIES.forEach(cat=>{
@@ -248,9 +249,10 @@ function initPage(){
   document.getElementById('hero-resolved').textContent=analytics.resolved;
   document.getElementById('hero-escalated').textContent=analytics.escalated;
   document.getElementById('hero-avg-resolution').textContent=`${analytics.avgResolutionDays || 0}d`;
+  document.getElementById('monthly-range-label').textContent=monthlySeries.rangeLabel;
   initNearby();
   // Charts
-  renderMiniBarChart('monthly-chart',MONTHLY_DATA.labels,MONTHLY_DATA.reported,MONTHLY_DATA.resolved,'Reported','Resolved');
+  renderMiniBarChart('monthly-chart',monthlySeries.labels,monthlySeries.reported,monthlySeries.resolved,'Reported','Resolved');
   renderDonutChart('status-donut','status-legend',analytics.resolutionStatus);
   setTimeout(()=>{renderGrid();document.getElementById('main-content').classList.add('loaded');},600);
 }
@@ -258,7 +260,7 @@ function initPage(){
 async function loadFeedData(){
   const [categories, issues]=await Promise.all([
     window.CivicAPI.fetchCategories(),
-    window.CivicAPI.fetchIssues({limit:50,sort:'heat'})
+    window.CivicAPI.fetchIssues({limit:100,sort:'recent'})
   ]);
 
   CATEGORIES.length=0;
