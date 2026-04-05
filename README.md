@@ -15,6 +15,11 @@
 </div>
 
 <br/>
+<div align="center">
+  <h1>
+    <a href="https://69d1a9fd51f3a5c6b3b00859--profound-centaur-b25eda.netlify.app/auth.html"> TRY OUT OUR APP HERE</a>
+  </h1>
+</div>
 
 <div align="center">
   <h3>🏙️ &nbsp; Report · Upvote · Track · Verify · Resolve &nbsp; 🏙️</h3>
